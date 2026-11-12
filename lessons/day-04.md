@@ -1,83 +1,146 @@
-# Day 04 — Best Time to Buy and Sell Stock
+# Day 4 — Next.js + React: display tasks in the browser
 
-**Pattern:** One-pass invariant · **Time:** 35 minutes · **Track:** Python interview DSA
+**Goal:** open `http://localhost:3000` and see PostgreSQL tasks. **Time:** ~90 min. **Today:** `frontend/app/types.ts`, `frontend/app/layout.tsx`, `frontend/app/page.tsx`. **Next:** [Day 5](day-05.md).
 
-[Course home](../README.md) · [Practice file](../practice/day-04.py) · [Commented reference](../solutions/day-04.py)
+## 1. Why a separate Next.js frontend? (15 min)
 
-## What and why (5 minutes)
+We already built Node HTTP endpoints to learn the backend. Next.js will consume them, making the boundary clear. A **Server Component** fetches the initial list on the Next server; it does not need `useEffect` just to fetch on page load. We'll add browser events on Day 5.
 
-**Problem:** Return the maximum profit from one buy before one sell.
-
-**Why this pattern:** Maintain minimum price seen so far, and best achievable profit.
-
-**Interview trap:** You cannot sell before buying; update profit using earlier prices.
-
-## Algorithm flow
+### Browser-to-database flow
 
 ```mermaid
-flowchart TD
-    A[Read input and constraints] --> B[Choose One-pass invariant invariant]
-    B --> C[Process one element or state]
-    C --> D{Done?}
-    D -- No --> C
-    D -- Yes --> E[Return result and analyze complexity]
+flowchart LR
+  Browser[Browser GET /] --> Next[Next.js Server Component]
+  Next -->|GET /tasks| Node[Node.js API]
+  Node -->|SELECT| DB[(PostgreSQL)]
+  DB --> Node
+  Node -->|JSON| Next
+  Next -->|HTML and React payload| Browser
 ```
 
-## Execution / timing diagram
+### Timing / sequence diagram
 
 ```mermaid
 sequenceDiagram
-    participant I as Interviewer
-    participant Y as You
-    participant P as Python
-    I->>Y: State problem and constraints
-    Y->>I: Explain brute force then One-pass invariant
-    Y->>P: Run dry trace on small input
-    P-->>Y: Track state after each step
-    Y->>I: Complexity and edge cases
+  participant Browser
+  participant Next as Next.js server
+  participant API as Node.js API
+  participant DB as PostgreSQL
+  Browser->>Next: GET /
+  Next->>API: GET /tasks (server-side fetch)
+  API->>DB: SELECT tasks
+  DB-->>API: Rows
+  API-->>Next: 200 + JSON tasks
+  Next-->>Browser: HTML + React Server Component payload
+  Note over Browser: Displays list (no client mutation yet)
 ```
 
-## Try it yourself (15 minutes)
+## 2. Install and start the Next.js project (15 min)
 
-1. Open `practice/day-04.py`. Write `solve(...)` without looking below.
-2. Verbally state the invariant and walk through a sample input.
-3. Run `python -m unittest discover -s tests -v` from the repository root (reference tests run against completed solutions).
-4. Check your practice implementation with `python scripts/check_practice.py 4` when you finish.
+**Leave Day 3 backend running in terminal A.** In terminal B, from repo root:
 
-### Sample cases
-
-```python
-solve([7, 1, 5, 3, 6, 4])  # 5
-```
-```python
-solve([7, 6, 4, 3, 1])  # 0
+```bash
+cd frontend
+npm install
+cp .env.local.example .env.local
+# API_BASE_URL is read by the Next.js server, not exposed to browser code.
+npm run dev
 ```
 
-## Commented solution — reveal after attempting
+This package already has `frontend/package.json` and a minimal Next App Router setup. You do **not** need `create-next-app` again.
 
-<details>
-<summary>Show Python reference implementation</summary>
+## 3. Define the shape of a task (10 min)
 
-```python
-def solve(prices):
-    minimum = float('inf')
-    best = 0
-    for price in prices:
-        best = max(best, price - minimum)
-        minimum = min(minimum, price)
-    return best
+Write `frontend/app/types.ts`:
+
+```ts
+export type Task = {
+  // pg returns BIGINT ids as decimal strings by default; do not assume JS safe integer.
+  id: string;
+  title: string;
+  done: boolean;
+  created_at: string;
+};
 ```
 
-</details>
 
-## Complexity (5 minutes)
+**Why a string ID?** PostgreSQL `BIGINT` is returned by `pg` as a string by default. A TypeScript type prevents us from casually assuming it is a safe JS number.
 
-**O(n) time, O(1) space.** Explain *why*, including auxiliary data structure cost.
+## 4. Create the page (25 min)
 
-## Tricky interview follow-up (10 minutes)
+Write `frontend/app/layout.tsx` (minimal styling only):
 
-**Question:** What if multiple buy/sell transactions are allowed?
+```tsx
+import type { ReactNode } from 'react';
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return <html lang="en"><body style={{fontFamily: 'system-ui, sans-serif', maxWidth: 740, margin: '48px auto', padding: '0 16px'}}>{children}</body></html>;
+}
+```
 
-Before moving on, explain (1) why your implementation is correct, (2) one edge case, (3) a trade-off versus a simpler solution.
 
-**Next:** [Day 05](day-05.md)
+Then write `frontend/app/page.tsx`:
+
+```tsx
+// Server Component: the initial data fetch happens on the Next.js server.
+// It can read API_BASE_URL without exposing a secret to the browser bundle.
+import type { Task } from './types';
+
+export default async function Home() {
+  const api = process.env.API_BASE_URL || 'http://localhost:3001';
+  let tasks: Task[] = [];
+  let error = '';
+
+  try {
+    // For teaching, always fetch current rows instead of caching the response.
+    const response = await fetch(`${api}/tasks`, { cache: 'no-store' });
+    // fetch does not reject on 404/500; check the HTTP status explicitly.
+    if (!response.ok) throw new Error(`API returned HTTP ${response.status}`);
+    tasks = (await response.json()) as Task[];
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Unknown error';
+  }
+
+  return (
+    <main>
+      <h1>MiniTrack</h1>
+      <p>{tasks.length} tasks</p>
+      {error ? <p role="alert">Could not load tasks: {error}</p> :
+        <ul>{tasks.map(task => (
+          // Stable keys let React preserve item identity between renders.
+          <li key={task.id}>{task.done ? '✅' : '⬜'} {task.title}</li>
+        ))}</ul>}
+    </main>
+  );
+}
+```
+
+
+Open `http://localhost:3000`. Expected: a `MiniTrack` heading, task count, and task list; the list comes from Postgres by way of Next → Node.
+
+## 5. Debug + interview (25 min)
+
+- Stop Node while Next stays on. Reload: you should get an error paragraph rather than a blank app. Restart Node.
+- Insert a task via `curl POST /tasks`; reload the browser. It should appear.
+- Remove `if (!response.ok)` and explore why `fetch` does not reject just because a server replied 500.
+
+**Q1. Server vs Client Component?** Server Components fetch/compose server-side data; Client Components are needed for interactive hooks/event handlers. Client Components can still have server-rendered HTML on initial load.
+
+**Q2. What is hydration?** React connects interactive client code to server-rendered HTML.
+
+**Q3. Why isn't this a `useEffect` fetch?** Initial data is available on the server; fewer loading states and a clearer server data boundary.
+
+**Q4. What does `cache: 'no-store'` do?** Requests fresh data rather than using the fetch cache in this teaching setup.
+
+**Q5. Why keep secrets out of browser code?** Anything bundled for the client can be inspected; use non-public env vars only on the server.
+
+**Q6. What is the React list key?** Stable identity for each item, not its array index.
+
+## Exit checklist
+
+- [ ] Page shows tasks from PostgreSQL.
+- [ ] Task count changes after curl POST + browser refresh.
+- [ ] I can explain each hop in the sequence diagram.
+
+**Commit:** `git add . && git commit -m "day4: show tasks in Next"`
+
+**Continue → [Day 5: forms, state and mutations](day-05.md)**

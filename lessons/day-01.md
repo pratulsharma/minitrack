@@ -1,87 +1,133 @@
-# Day 01 — Two Sum
+# Day 1 — JavaScript execution + your first HTTP API
 
-**Pattern:** Hash map · **Time:** 35 minutes · **Track:** Python interview DSA
+**Goal:** run `GET /tasks` returning a JSON array. **Time:** ~90 min. **Today's files:** `checkpoints/day1/server.cjs` (you will write its contents below). **Next:** [Day 2](day-02.md).
 
-[Course home](../README.md) · [Practice file](../practice/day-01.py) · [Commented reference](../solutions/day-01.py)
+## 0. Why we're doing this
 
-## What and why (5 minutes)
+Before frameworks, see what Node actually does: a function handles each HTTP request. In the app, a browser will eventually ask for tasks using exactly this contract.
 
-**Problem:** Return indices of two different elements adding to target.
+## 1. JavaScript execution model (15 min)
 
-**Why this pattern:** Store complements while scanning once.
+- **Call stack:** the functions executing right now; one frame pushed when a function is called, popped when it returns.
+- **Timer:** `setTimeout` registers a callback that may run later; `0` does not mean now.
+- **Microtask:** a fulfilled Promise's `.then(...)` callback runs after current synchronous code, before an eligible timer callback in this example.
 
-**Interview trap:** Check the map before inserting current value so you cannot reuse the same element.
+**Predict before running:**
 
-## Algorithm flow
+```js
+console.log('A');
+setTimeout(() => console.log('B'), 0); // Timer callback: not synchronous.
+Promise.resolve().then(() => console.log('C')); // Promise microtask.
+console.log('D');
+```
+
+
+**Answer:** `A D C B`. The two `console.log` calls run synchronously; the Promise callback is a microtask; timer callback runs afterward. **Interview trap:** timers don't interrupt synchronous JS, and a zero delay is not an immediate call.
+
+### Execution flow
 
 ```mermaid
 flowchart TD
-    A[Read input and constraints] --> B[Choose Hash map invariant]
-    B --> C[Process one element or state]
-    C --> D{Done?}
-    D -- No --> C
-    D -- Yes --> E[Return result and analyze complexity]
+  A[Start script] --> B[Print A on call stack]
+  B --> C[Register timer B]
+  C --> D[Queue Promise microtask C]
+  D --> E[Print D on call stack]
+  E --> F[Sync stack finishes]
+  F --> G[Run microtask C]
+  G --> H[Run timer callback B]
 ```
 
-## Execution / timing diagram
+### Timing / sequence diagram
 
 ```mermaid
 sequenceDiagram
-    participant I as Interviewer
-    participant Y as You
-    participant P as Python
-    I->>Y: State problem and constraints
-    Y->>I: Explain brute force then Hash map
-    Y->>P: Run dry trace on small input
-    P-->>Y: Track state after each step
-    Y->>I: Complexity and edge cases
+  participant JS as Main JS thread
+  participant Timer as Timer scheduler
+  participant Micro as Microtask queue
+  JS->>JS: console.log A
+  JS->>Timer: setTimeout(callback B, 0)
+  JS->>Micro: Promise.then(callback C)
+  JS->>JS: console.log D
+  Note over JS: Synchronous script ends
+  Micro-->>JS: Run callback C
+  Timer-->>JS: Run callback B when eligible
 ```
 
-## Try it yourself (15 minutes)
+## 2. Write the server (35 min)
 
-1. Open `practice/day-01.py`. Write `solve(...)` without looking below.
-2. Verbally state the invariant and walk through a sample input.
-3. Run `python -m unittest discover -s tests -v` from the repository root (reference tests run against completed solutions).
-4. Check your practice implementation with `python scripts/check_practice.py 1` when you finish.
+From the extracted repository root:
 
-### Sample cases
-
-```python
-solve([2, 7, 11, 15], 9)  # [0, 1]
-```
-```python
-solve([3, 3], 6)  # [0, 1]
-```
-```python
-solve([1, 2], 7)  # []
+```bash
+mkdir -p checkpoints/day1
+code checkpoints/day1/server.cjs  # Or open the file in VS Code manually
 ```
 
-## Commented solution — reveal after attempting
+**Write all of this code into `checkpoints/day1/server.cjs`:**
 
-<details>
-<summary>Show Python reference implementation</summary>
+```js
+const http = require('node:http'); // Built-in Node module: no npm package needed.
 
-```python
-def solve(nums, target):
-    seen = {}  # number -> its earliest index
-    for i, value in enumerate(nums):
-        complement = target - value
-        if complement in seen:  # use an earlier, distinct element
-            return [seen[complement], i]
-        seen[value] = i
-    return []  # no matching pair
+// In-memory data lasts only until we stop this Node process.
+const tasks = [
+  { id: 1, title: 'Learn the event loop', done: false },
+];
+
+// Node calls this function for each incoming HTTP request.
+const server = http.createServer((req, res) => {
+  // The method (GET) and path (/tasks) together identify our route.
+  if (req.method === 'GET' && req.url === '/tasks') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(tasks)); // Convert JS array to JSON; finish response.
+    return; // Critical: do not fall through and send another response.
+  }
+
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Not found' }));
+});
+
+// 3001 is the API port; the frontend will later use port 3000.
+server.listen(3001, () => console.log('API: http://localhost:3001'));
 ```
 
-</details>
 
-## Complexity (5 minutes)
+**Why these decisions?** `node:http` shows the HTTP lifecycle without hiding it in a framework. `GET /tasks` only reads data. `JSON.stringify()` serializes JavaScript objects; `res.end()` completes the response; `return` prevents a second response.
 
-**O(n) time, O(n) space.** Explain *why*, including auxiliary data structure cost.
+## 3. Run and verify (10 min)
 
-## Tricky interview follow-up (10 minutes)
+```bash
+node checkpoints/day1/server.cjs
+# In another terminal from anywhere:
+curl -i http://localhost:3001/tasks
+curl -i http://localhost:3001/unknown
+```
 
-**Question:** How does this change if the array is already sorted?
+Expected: `/tasks` → HTTP **200**, JSON array with one task; `/unknown` → **404**. Stop the server with **Ctrl+C** before Day 2 (same port).
 
-Before moving on, explain (1) why your implementation is correct, (2) one edge case, (3) a trade-off versus a simpler solution.
+## 4. Debugging experiments (15 min)
 
-**Next:** [Day 02](day-02.md)
+1. Temporarily remove `res.end(...)`: does curl finish? Restore it.
+2. Change the path check to `/task`: why does `/tasks` now return 404?
+3. Add a brief synchronous busy loop before `res.end()`. Can other JS handlers run during it? Remove it afterward.
+
+## 5. Interview practice (15 min)
+
+**Q1. What goes on the call stack?** Function calls that run synchronously, including the HTTP request handler when invoked.
+
+**Q2. What is queued vs immediately executed?** Timer callbacks wait until their scheduling phase; resolved Promise handlers are microtasks; direct `console.log` runs now.
+
+**Q3. Is Node multithreaded?** The main JS execution thread runs callbacks serially, while Node/libuv and the OS enable concurrent I/O; additional worker threads are possible.
+
+**Q4. Why does `res.end()` matter?** It tells Node that the HTTP response is complete.
+
+**Q5. What does status 404 mean?** The requested route/resource isn't found; not a syntax error in JavaScript.
+
+## Exit checklist
+
+- [ ] I predicted `A D C B` correctly (or can explain my correction).
+- [ ] I typed and ran the server.
+- [ ] I can explain `req`, `res`, and `return`.
+- [ ] I wrote a short reflection in `docs/MY_NOTES.md`.
+
+**Commit:** `git add . && git commit -m "day1: HTTP GET and event loop"`
+
+**Continue → [Day 2: POST, promises and closures](day-02.md)**
