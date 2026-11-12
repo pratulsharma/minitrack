@@ -18,3 +18,7 @@
 | HTTP idempotency | `lessons/day-5.md` | Can retrying POST create duplicates? |
 
 **Review method:** look at the question, say your answer aloud, then open referenced code. Note what you got wrong in `docs/MY_NOTES.md`.
+
+## Where the executable explanations live
+
+Each [day lesson](../lessons/day-1.md) has two Mermaid diagrams (flow and sequence/timing), fully commented source, and scenario-based Q&A. Review the diagrams first, then predict the behavior, then open the source file.

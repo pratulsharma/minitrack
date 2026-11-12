@@ -18,6 +18,14 @@ A **small task tracker** built to learn JavaScript, Node.js, Next.js, React, Pos
 
 **Time:** ~90 minutes per day. **Rule:** attempt each lesson's exercise before viewing reference code.
 
+## Start here: lessons contain all the code and diagrams
+
+**Read in order:** [Day 1](lessons/day-1.md) → [Day 2](lessons/day-2.md) → [Day 3](lessons/day-3.md) → [Day 4](lessons/day-4.md) → [Day 5](lessons/day-5.md).
+
+Each day is a **standalone, sequential tutorial**: why, exact filenames, complete commented code, terminal commands, expected output, flowchart, timing/sequence diagram, debugging challenges and interview Q&A. Mermaid diagrams render directly in GitHub Markdown. You do **not** need to browse checkpoint folders to understand the implementation.
+
+**Progressive path:** Days 1–2 use `checkpoints/day1` and `checkpoints/day2` as scratch files; Day 3 replaces `backend/src/server.js` with the simpler Day 3 code shown in the lesson; Day 4 replaces `frontend/app/page.tsx` with its read-only version; Day 5 upgrades both to the complete reference versions. Existing `backend/` and `frontend/` files in the archive are **end-of-week references**, not prerequisites for earlier days.
+
 ## Folder map
 
 ```text
@@ -27,7 +35,10 @@ minitrack-week1/
 ├── exercises/               # Small JS interview exercises
 ├── checkpoints/
 │   ├── day1/server.cjs      # Fully runnable intermediate Day 1 server
-│   └── day2/server.cjs      # Fully runnable intermediate Day 2 server
+│   ├── day2/server.cjs      # Fully runnable intermediate Day 2 server
+│   ├── day3/server.js       # Simpler persistent GET/POST server
+│   ├── day4/page.tsx        # Read-only Next.js page
+│   └── day5/               # Finished server and page
 ├── backend/                 # End-of-week reference Node API
 │   ├── src/server.js
 │   ├── src/tasks.js
