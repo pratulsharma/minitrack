@@ -129,6 +129,30 @@ Bottom Node internals
 
 An asynchronous operation does not remain on the stack while it waits. Its callback is scheduled to run on a future stack when the operation is ready.
 
+JavaScript execution involves:
+
+1. Call Stack
+   - Executes synchronous JavaScript code.
+   - Functions are pushed onto the stack when called
+     and popped off when they finish.
+
+2. Microtask Queue (higher priority)
+   - Promise.then(), .catch(), .finally()
+   - Continuations after await
+   - queueMicrotask()
+
+3. Task Queue (Macrotask Queue)
+   - setTimeout()
+   - setInterval()
+   - User events such as clicks
+
+4. Event Loop
+   - Coordinates execution.
+   - When the call stack is empty:
+     a. Execute all pending microtasks.
+     b. Run the next task.
+     c. Process any new microtasks.
+     d. Repeat.
 ### Q2. What is queued versus immediately executed?
 
 **Interview-ready answer:** Ordinary statements and function calls execute immediately on the current call stack. Promise handlers are queued as microtasks, while timers and I/O callbacks are scheduled for later event-loop phases. After the current stack finishes, Node drains eligible microtasks before moving to the next event-loop phase.
