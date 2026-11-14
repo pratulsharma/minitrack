@@ -142,12 +142,109 @@ Before looking at the finished code, add `GET /count` returning `{"count": tasks
 
 ## 5. Interview / debugging (15 min)
 
-1. **Does `await` block Node?** It suspends that async function; other callbacks can run while waiting for I/O.
-2. **Can you `await` outside an async function?** Top-level `await` is permitted in ES modules, but not ordinary CommonJS files; inside a function, declare it `async`.
-3. **What happens if a Promise rejects?** The awaited expression throws in the async function; handle with `try/catch` or pass rejection to caller.
-4. **Is `Promise.all` sequential?** No. It subscribes to multiple already-started async operations and settles when all fulfill or one rejects; it doesn't spawn threads.
-5. **What is a closure?** A function retaining access to its lexical environment.
-6. **Why not treat HTTP body as a single string?** It is delivered as a stream over time.
+Practice answering two or three aloud today. Lead with the first paragraph and use the example if the interviewer asks a follow-up.
+
+### Q1. Does `await` block Node.js?
+
+**Interview-ready answer:** `await` pauses only the current `async` function until its Promise settles. It does not block Node's event loop, so other ready callbacks and requests can run while the operation is waiting. Synchronous CPU-heavy work is what blocks the main JavaScript thread.
+
+**Example:**
+
+```js
+const task = await readTaskFromDatabase();
+```
+
+While the database is working, this handler is suspended. Node can process another request. When the Promise settles, the rest of the handler is scheduled as a microtask.
+
+**Important distinction:** `await slowDatabaseQuery()` is non-blocking when the database client performs asynchronous I/O. `await` cannot make a synchronous busy loop non-blocking.
+
+### Q2. Can you use `await` outside an `async` function?
+
+**Interview-ready answer:** Inside a function, `await` normally requires that function to be declared `async`. Top-level `await` is supported in ES modules, but not in an ordinary CommonJS file such as this lesson's `.cjs` server.
+
+**Example:**
+
+```js
+async function loadTasks() {
+  const tasks = await fetchTasks();
+  return tasks;
+}
+```
+
+Adding `async` also means the function always returns a Promise. Returning `tasks` therefore fulfills that Promise with the task array.
+
+### Q3. What happens when a Promise rejects?
+
+**Interview-ready answer:** A rejected Promise represents an asynchronous failure. If I `await` it, JavaScript throws the rejection reason at that line, so I can handle it with `try/catch`; otherwise the Promise returned by the surrounding `async` function also rejects.
+
+**Example:**
+
+```js
+try {
+  const body = await readJsonBody(req);
+  res.end(JSON.stringify(body));
+} catch (error) {
+  res.writeHead(400);
+  res.end(JSON.stringify({ error: 'Invalid JSON' }));
+}
+```
+
+Malformed JSON causes `JSON.parse` to throw, which rejects `readJsonBody`. The handler catches that failure and translates it into an HTTP response instead of leaving the request unresolved.
+
+**Senior follow-up:** Catch an error only where you can recover, add context, or translate it into the boundary's error format. Do not silently swallow it.
+
+### Q4. Is `Promise.all` sequential?
+
+**Interview-ready answer:** No. `Promise.all` observes several Promises together and fulfills when all of them fulfill. It rejects as soon as one input rejects. The operations can overlap if their Promises were started before or while constructing the input array, but `Promise.all` does not create threads.
+
+**Example:**
+
+```js
+const [tasks, profile] = await Promise.all([
+  fetchTasks(),
+  fetchProfile(),
+]);
+```
+
+If both operations are independent and each takes about 100 ms, overlapping them can finish in roughly 100 ms rather than the roughly 200 ms of awaiting one and then starting the other.
+
+**Do not use it blindly:** If the second operation depends on the first result, they must remain sequential. Use `Promise.allSettled` when every outcome is needed even if one operation fails.
+
+### Q5. What is a closure?
+
+**Interview-ready answer:** A closure is a function together with access to the lexical variables from the scope where the function was created, even after that outer scope has finished executing.
+
+**Example:** The HTTP request handler closes over the module-level `tasks` array:
+
+```js
+const tasks = [];
+
+const server = http.createServer((req, res) => {
+  tasks.push({ id: tasks.length + 1, title: 'New task' });
+});
+```
+
+Node does not create a new `tasks` array for every request. Every invocation of the handler accesses the same in-memory array while that process is running.
+
+**Senior follow-up:** Closures are useful for encapsulation and callbacks, but they can also keep large objects alive longer than expected or capture stale values in UI code.
+
+### Q6. Why shouldn't you treat the HTTP request body as one immediately available string?
+
+**Interview-ready answer:** An HTTP body arrives as a stream of byte chunks over time. The server must collect or process those chunks and wait for the stream's `end` event before it can parse the complete JSON document.
+
+**Example:**
+
+```js
+let body = '';
+req.on('data', chunk => {
+  body += chunk;
+});
+req.on('end', () => {
+  const value = JSON.parse(body);
+});
+```
+
+A small body may happen to arrive in one chunk, but the API does not guarantee that. Production code should also enforce a body-size limit so a client cannot exhaust server memory by sending an unbounded payload.
 
 ## Exit checklist
 

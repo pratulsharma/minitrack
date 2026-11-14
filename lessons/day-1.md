@@ -113,15 +113,70 @@ Expected: `/tasks` → HTTP **200**, JSON array with one task; `/unknown` → **
 
 ## 5. Interview practice (15 min)
 
-**Q1. What goes on the call stack?** Function calls that run synchronously, including the HTTP request handler when invoked.
+Practice saying the **direct answer** first. Add the example only after the interviewer asks you to explain further.
 
-**Q2. What is queued vs immediately executed?** Timer callbacks wait until their scheduling phase; resolved Promise handlers are microtasks; direct `console.log` runs now.
+### Q1. What goes on the call stack?
 
-**Q3. Is Node multithreaded?** The main JS execution thread runs callbacks serially, while Node/libuv and the OS enable concurrent I/O; additional worker threads are possible.
+**Interview-ready answer:** The call stack contains the execution frames for JavaScript functions that are currently running. It follows last-in, first-out order, and Node runs each synchronous stack to completion before processing another callback.
 
-**Q4. Why does `res.end()` matter?** It tells Node that the HTTP response is complete.
+**Example:** When a request reaches the server, Node calls the request handler and places its frame on the stack. The handler calls `JSON.stringify(tasks)`, so that call is placed above the handler. `JSON.stringify` finishes first, then the handler continues and eventually returns.
 
-**Q5. What does status 404 mean?** The requested route/resource isn't found; not a syntax error in JavaScript.
+```text
+Top    JSON.stringify(tasks)
+       request handler
+Bottom Node internals
+```
+
+An asynchronous operation does not remain on the stack while it waits. Its callback is scheduled to run on a future stack when the operation is ready.
+
+### Q2. What is queued versus immediately executed?
+
+**Interview-ready answer:** Ordinary statements and function calls execute immediately on the current call stack. Promise handlers are queued as microtasks, while timers and I/O callbacks are scheduled for later event-loop phases. After the current stack finishes, Node drains eligible microtasks before moving to the next event-loop phase.
+
+**Example:**
+
+```js
+console.log('A');
+setTimeout(() => console.log('B'), 0);
+Promise.resolve().then(() => console.log('C'));
+console.log('D');
+```
+
+The output is `A D C B`: `A` and `D` run synchronously, the Promise handler runs as a microtask, and the timer callback runs later. A zero-millisecond timer means "not before this delay"; it does not mean "run immediately."
+
+### Q3. Is Node.js multithreaded?
+
+**Interview-ready answer:** JavaScript callbacks normally execute one at a time on Node's main event-loop thread. However, Node itself is not entirely single-threaded: the operating system handles much asynchronous network I/O, libuv has a worker pool for operations such as file system and some crypto work, and an application can explicitly use Worker Threads for CPU-heavy JavaScript.
+
+**Example:** While this server waits for a client or database response, the main JavaScript thread can handle another ready callback. But a large synchronous loop in one request handler blocks that thread and delays every other request.
+
+**Senior follow-up:** Concurrency means tasks can make progress during overlapping periods. Parallelism means tasks literally execute at the same time, which requires multiple threads or processes.
+
+### Q4. Why does `res.end()` matter?
+
+**Interview-ready answer:** `res.end()` tells Node that the HTTP response is complete. It sends any final response data and prevents the client from waiting indefinitely for more bytes.
+
+**Example:**
+
+```js
+res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify(tasks));
+return;
+```
+
+`res.end()` ends the **response**, but it does not automatically stop the JavaScript function. The `return` stops the handler from falling through and attempting to send the later 404 response. No `return` is needed after the final 404 response because the callback naturally reaches its end there.
+
+### Q5. What does HTTP status 404 mean?
+
+**Interview-ready answer:** `404 Not Found` means the server was reached, understood the request, but could not find a resource or route matching the requested URL. It describes the HTTP result, not a JavaScript syntax error or a server crash.
+
+**Example:** `GET /tasks` matches this server's route and returns `200 OK`. `GET /unknown` reaches the same server but matches no route, so it returns `404 Not Found`.
+
+**Useful comparison:**
+
+- `400 Bad Request`: the client's request data is invalid.
+- `404 Not Found`: the requested route or resource does not exist.
+- `500 Internal Server Error`: the server failed while processing a valid request.
 
 ## Exit checklist
 

@@ -308,16 +308,160 @@ Open **http://localhost:3000**. Add a task, mark it done, filter Open/Done, dele
 
 **Break it on purpose:** remove `event.preventDefault()` and observe traditional form navigation; remove `router.refresh()` and see stale task props; stop PostgreSQL and check error feedback; simulate double submits and explain why UI disabling alone is not a duplicate-proof guarantee.
 
-1. **Why not directly mutate `tasks` prop?** React needs immutable updates/new renders; props are read-only input to a component.
-2. **What is a stale closure?** A handler sees values captured during an earlier render; a functional state update can avoid some stale-state bugs.
-3. **What does `setState` do?** Schedules a React update; the current handler's variable remains its render snapshot.
-4. **What does `event.preventDefault()` prevent?** Browser's default form navigation behavior.
-5. **Why use `key={task.id}` rather than index?** Stable identity across reorder/delete.
-6. **Why not keep filtered tasks in state?** It's derived from current props plus filter; avoid synchronization bugs.
-7. **Why is POST non-idempotent?** Repeating a creation request can insert duplicates. A real system can use idempotency keys.
-8. **Why PATCH?** Change only `done`, rather than replace the entire task resource.
-9. **Why is no CORS configuration needed?** The browser and Route Handler share the same origin.
-10. **What is the full data path?** UI handler → same-origin `fetch` → Route Handler → parameterized SQL → Postgres → JSON → `router.refresh` → Server Component query → fresh props.
+Practice answering a few questions aloud in 30–60 seconds each. Start with the bold answer, then use the example and trade-off if the interviewer asks for depth.
+
+### Q1. Why shouldn't a component directly mutate its `tasks` prop?
+
+**Interview-ready answer:** Props are read-only inputs owned by the parent. React relies on new object or array references to describe changes, so mutating a prop can leave the parent data inconsistent and may not produce the render behavior we expect.
+
+**Bad example:**
+
+```tsx
+tasks.push(newTask);
+```
+
+This changes the existing array. A safe local update creates a new array:
+
+```tsx
+setLocalTasks(current => [...current, newTask]);
+```
+
+In MiniTrack, the database is the source of truth, so the mutation goes through the API and `router.refresh()` asks the Server Component for fresh task props.
+
+### Q2. What is a stale closure in React?
+
+**Interview-ready answer:** A callback closes over the values from the render in which that callback was created. If it runs later, those captured values can be older than the component's latest state; that is a stale closure.
+
+**Example:**
+
+```tsx
+setTimeout(() => {
+  setCount(count + 1);
+}, 1000);
+```
+
+The callback captures that render's `count`. If the count changes before the timer runs, it may calculate from an old value. A functional update asks React to provide the latest committed state:
+
+```tsx
+setCount(current => current + 1);
+```
+
+**Senior follow-up:** Functional updates solve updates based on previous state. Effects also require correct dependency arrays; omitting a changing value can make an effect's closure stale.
+
+### Q3. What does a React state setter do?
+
+**Interview-ready answer:** A state setter requests a future render with a new state value. It does not rewrite the variable inside the currently running handler, because each render receives its own state snapshot. React may batch multiple update requests for efficiency.
+
+**Example:**
+
+```tsx
+console.log(count); // 0
+setCount(count + 1);
+console.log(count); // still 0 in this handler
+```
+
+The next render sees `1`. When the next value depends on the previous value, use the functional form:
+
+```tsx
+setCount(current => current + 1);
+```
+
+### Q4. What does `event.preventDefault()` do in a form submission?
+
+**Interview-ready answer:** It prevents the browser's default action for that event. For a form submission, the default is a traditional navigation/submission that reloads or replaces the current document. Preventing it lets React handle the request with JavaScript.
+
+**Example:**
+
+```tsx
+async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+  await fetch('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ title }),
+  });
+}
+```
+
+It does not stop event propagation; `event.stopPropagation()` is the separate API for preventing an event from continuing through the DOM propagation path.
+
+### Q5. Why use `key={task.id}` instead of the array index?
+
+**Interview-ready answer:** React uses keys to match sibling elements between renders. A database ID follows the same logical task when items are added, deleted, filtered, or reordered. An index describes only the item's current position.
+
+**Example:** If tasks `[A, B, C]` use indexes and `A` is deleted, `B` changes from key `1` to key `0`. React may reuse the component previously associated with `A`, causing local input state or focus to appear on the wrong task.
+
+```tsx
+tasks.map(task => (
+  <TaskRow key={task.id} task={task} />
+));
+```
+
+Using an index is acceptable only for a truly static list that will not reorder, insert, delete, or hold item-specific component state.
+
+### Q6. Why not store the filtered task list in state?
+
+**Interview-ready answer:** The filtered list is derived from existing `tasks` and `filter` values, so it can be calculated during rendering. Storing the same information separately creates two sources of truth and requires synchronization whenever either input changes.
+
+**Example:**
+
+```tsx
+const visibleTasks = tasks.filter(task => {
+  if (filter === 'open') return !task.done;
+  if (filter === 'done') return task.done;
+  return true;
+});
+```
+
+For an expensive calculation, `useMemo` can cache the result when measurement shows it is useful, but it is still derived data rather than independent state.
+
+### Q7. Why is POST usually considered non-idempotent?
+
+**Interview-ready answer:** An operation is idempotent when repeating the same request has the same intended server state as sending it once. POST commonly creates a new resource, so retrying the same request can create another task and change the server state again.
+
+**Example:** Sending `POST /api/tasks` twice with `{"title":"Study React"}` can create two rows with different IDs.
+
+**Senior follow-up:** Disabling the submit button reduces accidental double-clicks but does not protect against network retries or multiple clients. A creation API can accept an idempotency key, store the first result for that key, and return the same result for a retry.
+
+### Q8. Why use PATCH to update a task?
+
+**Interview-ready answer:** PATCH represents a partial update to a resource. MiniTrack changes only the `done` field, so the client can send that field without resending and replacing the entire task representation.
+
+**Example:**
+
+```http
+PATCH /api/tasks/42
+Content-Type: application/json
+
+{"done":true}
+```
+
+`PUT` conventionally represents creating or replacing the resource at the target URI, while `PATCH` applies a partial change. The server must still validate allowed fields and authorize access; PATCH does not provide those protections automatically.
+
+### Q9. Why does MiniTrack not need CORS configuration for these requests?
+
+**Interview-ready answer:** The page and Route Handler use the same origin: the same scheme, host, and port. The browser's same-origin policy therefore allows the page to call `/api/tasks` without cross-origin permission.
+
+**Example:** A page at `http://localhost:3000` calling `http://localhost:3000/api/tasks` is same-origin. Calling `http://localhost:3001/tasks` is cross-origin because the port differs and may require the API to return appropriate CORS headers.
+
+**Senior follow-up:** CORS is a browser-enforced read policy, not authentication or authorization. It does not stop servers, command-line tools, or other non-browser clients from sending requests.
+
+### Q10. What is the complete data path for creating a task?
+
+**Interview-ready answer:** The Client Component handles the form and sends a same-origin POST request. The Route Handler validates the input and calls a server-side task function, which executes parameterized SQL in PostgreSQL. The handler returns JSON, and after success `router.refresh()` asks Next.js to rerender the Server Component so it queries PostgreSQL and sends fresh task props.
+
+```text
+1. User submits form
+2. Client handler -> POST /api/tasks
+3. Route Handler -> validate title
+4. Task helper -> parameterized INSERT
+5. PostgreSQL -> inserted row
+6. Route Handler -> 201 JSON response
+7. Client -> router.refresh()
+8. Server Component -> SELECT tasks
+9. React -> refreshed task UI
+```
+
+**Senior follow-up:** Each boundary has a responsibility: the browser manages interaction, the HTTP handler validates and translates protocol concerns, the server module owns data access, and PostgreSQL enforces persistence and database constraints. Errors should be handled and surfaced at the boundary where they can be meaningfully translated.
 
 ## Exit checklist
 

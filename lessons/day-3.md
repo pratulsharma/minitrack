@@ -244,12 +244,96 @@ UPDATE tasks SET done = TRUE WHERE id = 1 RETURNING *;
 SELECT COUNT(*) FROM tasks WHERE done = FALSE;
 ```
 
-1. **Why `$1` instead of template strings?** Bound parameters keep values separate from SQL syntax and prevent SQL injection in values.
-2. **Why `RETURNING`?** Return generated ID and defaults without a second query.
-3. **Is the database ID guaranteed gap-free?** No. Uniqueness and consecutive numbering are different requirements.
-4. **What if the pool is full?** Additional requests wait for a free connection; configure limits/timeouts for real systems.
-5. **Why use `await pool.query`?** The Route Handler pauses while PostgreSQL works, without blocking the JavaScript event loop from handling other requests.
-6. **What if Postgres goes down?** Query rejects, handler catches it and returns a server error; production systems need logging, timeouts and recovery plans.
+Practice giving the short answer first, then support it with the MiniTrack example.
+
+### Q1. Why use `$1` parameters instead of building SQL with template strings?
+
+**Interview-ready answer:** A parameterized query sends SQL structure and user-supplied values separately. PostgreSQL treats the supplied value as data rather than executable SQL syntax, which prevents SQL injection through that value and also handles escaping correctly.
+
+**Unsafe example:**
+
+```js
+const sql = `INSERT INTO tasks (title) VALUES ('${title}')`;
+```
+
+An attacker-controlled title could break out of the quoted value and alter the query.
+
+**Safe example:**
+
+```js
+await pool.query(
+  'INSERT INTO tasks (title) VALUES ($1)',
+  [title],
+);
+```
+
+**Senior follow-up:** Parameters protect values, not dynamic table names, column names, or SQL keywords. Dynamic identifiers must usually be selected from a trusted allowlist rather than copied directly from user input.
+
+### Q2. Why use PostgreSQL's `RETURNING` clause?
+
+**Interview-ready answer:** `RETURNING` gives the application the row created or changed by an `INSERT`, `UPDATE`, or `DELETE` in the same database round trip. It can return generated IDs, defaults, and timestamps without a second `SELECT`.
+
+**Example:**
+
+```sql
+INSERT INTO tasks (title)
+VALUES ($1)
+RETURNING id, title, done, created_at;
+```
+
+The response contains the exact inserted row, including its database-generated `id` and default `done = FALSE`. A separate query would add latency and could introduce race conditions if it tried to identify the row indirectly.
+
+### Q3. Is a generated database ID guaranteed to be gap-free?
+
+**Interview-ready answer:** No. A primary key or sequence guarantees identity and uniqueness, not consecutive numbering. Gaps can occur because a transaction rolls back, a row is deleted, or sequence values are cached or allocated by concurrent requests.
+
+**Example:** IDs `1`, `2`, and `3` may be allocated, but the transaction using `2` can fail. The visible rows may then have IDs `1` and `3`.
+
+**Senior follow-up:** IDs should not be used as business-visible sequence numbers such as invoice numbers when the business requires a special gap policy. That requirement needs separate domain logic and careful concurrency design.
+
+### Q4. What happens when the database connection pool is full?
+
+**Interview-ready answer:** A connection pool has a maximum number of active database connections. When all are busy, another query normally waits in the pool's queue until a connection is released or a timeout/error occurs. This applies backpressure and protects PostgreSQL from an unbounded number of connections.
+
+**Example:** With a pool limit of 10, the first 10 long-running queries can use connections while the 11th request waits. If requests arrive faster than queries finish, latency and queue length grow.
+
+**Senior follow-up:** Production configuration should coordinate application-instance count, pool size, PostgreSQL's connection limit, query timeouts, and pool wait timeouts. Scaling to 20 app instances with a pool of 20 could potentially request 400 database connections.
+
+### Q5. Why use `await pool.query(...)`?
+
+**Interview-ready answer:** `pool.query` returns a Promise for an asynchronous database operation. `await` makes the handler wait for that result in readable control flow, but it suspends only that handler; it does not block Node's event loop from processing other ready work.
+
+**Example:**
+
+```js
+const result = await pool.query(
+  'SELECT id, title FROM tasks ORDER BY id',
+);
+return Response.json(result.rows);
+```
+
+The response must wait because it needs `result.rows`. While PostgreSQL executes the query, Node can serve another request whose work is ready.
+
+### Q6. What should happen if PostgreSQL becomes unavailable?
+
+**Interview-ready answer:** The database operation rejects or times out. The request boundary should catch the failure, log useful diagnostic context on the server, and return a non-sensitive `5xx` response. A production system should also use timeouts, health monitoring, alerts, and an appropriate retry or recovery strategy.
+
+**Example:**
+
+```js
+try {
+  const tasks = await listTasks();
+  return Response.json(tasks);
+} catch (error) {
+  console.error('Unable to list tasks', error);
+  return Response.json(
+    { error: 'Service temporarily unavailable' },
+    { status: 503 },
+  );
+}
+```
+
+**Senior follow-up:** Retries are safest for transient failures and idempotent operations. Blindly retrying an `INSERT` after an uncertain network failure can create duplicates, so creation APIs may need an idempotency key or another deduplication strategy.
 
 ## Exit checklist
 
