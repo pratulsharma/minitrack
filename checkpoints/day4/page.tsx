@@ -1,18 +1,14 @@
-// Server Component: the initial data fetch happens on the Next.js server.
-// It can read API_BASE_URL without exposing a secret to the browser bundle.
+import { listTasks } from '../lib/tasks';
 import type { Task } from './types';
 
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
-  const api = process.env.API_BASE_URL || 'http://localhost:3001';
   let tasks: Task[] = [];
   let error = '';
 
   try {
-    // For teaching, always fetch current rows instead of caching the response.
-    const response = await fetch(`${api}/tasks`, { cache: 'no-store' });
-    // fetch does not reject on 404/500; check the HTTP status explicitly.
-    if (!response.ok) throw new Error(`API returned HTTP ${response.status}`);
-    tasks = (await response.json()) as Task[];
+    tasks = await listTasks();
   } catch (err) {
     error = err instanceof Error ? err.message : 'Unknown error';
   }

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1150" height="767" viewBox="0 0 1150 767" role="img" aria-labelledby="title description">
+  <title id="title">MiniTrack dark sign-in screen concept</title>
+  <desc id="description">Dark sign-in screen concept with email and password fields.</desc>
+  <rect width="1150" height="767" fill="#090e18"/>
+  <rect x="50" y="48" width="1050" height="671" rx="17" fill="#111a2a" stroke="#2b3850"/>
+  <path d="M50 116h1050" stroke="#29354a"/>
+  <rect x="92" y="76" width="18" height="18" rx="4" fill="#1e2440" stroke="#a99cff" stroke-width="1.5"/>
+  <path d="m96 85 4 4 7-8" fill="none" stroke="#c6bdff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="118" y="91" fill="#f3f6fc" font-family="Inter, Arial, sans-serif" font-size="21" font-weight="750">MiniTrack</text>
+  <text x="866" y="88" fill="#c4cede" font-family="Inter, Arial, sans-serif" font-size="14">My tasks</text>
+  <text x="954" y="88" fill="#aab6c9" font-family="Inter, Arial, sans-serif" font-size="14">Alex Morgan</text>
+  <circle cx="1050" cy="83" r="10" fill="#1b2638" stroke="#9eacc2" stroke-width="1.5"/>
+
+  <text x="375" y="220" fill="#a99cff" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="1.8">YOUR WORKSPACE</text>
+  <text x="375" y="270" fill="#f3f6fc" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="700">Welcome back</text>
+  <text x="375" y="297" fill="#9aa8bd" font-family="Inter, Arial, sans-serif" font-size="15">Sign in to see only your own tasks.</text>
+  <text x="375" y="341" fill="#e8edf7" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="650">Email</text>
+  <rect x="375" y="353" width="400" height="44" rx="9" fill="#0b111c" stroke="#344158"/>
+  <text x="391" y="381" fill="#9ba9be" font-family="Inter, Arial, sans-serif" font-size="14">alex@example.com</text>
+  <text x="375" y="432" fill="#e8edf7" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="650">Password</text>
+  <rect x="375" y="444" width="400" height="44" rx="9" fill="#0b111c" stroke="#344158"/>
+  <text x="391" y="472" fill="#9ba9be" font-family="Inter, Arial, sans-serif" font-size="14">••••••••••</text>
+  <rect x="375" y="510" width="400" height="42" rx="9" fill="#7768ed"/>
+  <text x="575" y="537" fill="#fff" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Sign in</text>
+  <rect x="375" y="574" width="400" height="58" rx="9" fill="#171f30" stroke="#38445c"/>
+  <text x="391" y="599" fill="#aab6ca" font-family="Inter, Arial, sans-serif" font-size="13">This screen is a proposed later-course feature, not part of</text>
+  <text x="391" y="617" fill="#aab6ca" font-family="Inter, Arial, sans-serif" font-size="13">the first four days.</text>
+</svg>

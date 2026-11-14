@@ -2,6 +2,8 @@
 
 **Goal:** run `GET /tasks` returning a JSON array. **Time:** ~90 min. **Today's files:** `checkpoints/day1/server.cjs` (you will write its contents below). **Next:** [Day 2](day-02.md).
 
+For the complete app sequence, progress tracker, concepts, and interview questions for every day, see the [MiniTrack app build roadmap](../docs/APP_BUILD_ROADMAP.md).
+
 ## 0. Why we're doing this
 
 Before frameworks, see what Node actually does: a function handles each HTTP request. In the app, a browser will eventually ask for tasks using exactly this contract.

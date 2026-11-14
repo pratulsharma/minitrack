@@ -1,6 +1,6 @@
 # Day 3 — PostgreSQL, SQL, parameters and connection pools
 
-**Goal:** save tasks so they survive restarts. **Time:** ~90 min. **Today:** write `backend/sql/schema.sql`, `backend/src/db.js`, and `backend/src/server.js`. **Next:** [Day 4](day-4.md).
+**Goal:** save tasks so they survive restarts. **Time:** ~90 min. **Today:** create the PostgreSQL schema and build typed Next.js Route Handlers with `pg`. **Next:** [Day 4](day-4.md).
 
 ## 1. Why PostgreSQL? (10 min)
 
@@ -10,7 +10,7 @@ Day 2's array is local to one Node process and disappears after restart. Postgre
 
 ```mermaid
 flowchart LR
-  Client[curl] -->|HTTP GET/POST| API[Node HTTP API]
+  Client[curl or browser] -->|HTTP GET/POST| API[Next.js Route Handler]
   API -->|parameterized SQL| Pool[pg.Pool]
   Pool --> DB[(PostgreSQL tasks table)]
   DB -->|result rows| Pool
@@ -23,17 +23,17 @@ flowchart LR
 ```mermaid
 sequenceDiagram
   participant Client as curl
-  participant Node as Node API
+  participant Next as Next.js Route Handler
   participant Pool as pg.Pool
   participant DB as PostgreSQL
-  Client->>Node: POST /tasks JSON
-  Node->>Node: await readJson and validate
-  Node->>Pool: query INSERT ... VALUES ($1) RETURNING ...
+  Client->>Next: POST /api/tasks JSON
+  Next->>Next: await request.json and validate
+  Next->>Pool: query INSERT ... VALUES ($1) RETURNING ...
   Pool->>DB: Send parameterized SQL and title value
-  Note over Node: Async handler suspended during DB I/O
+  Note over Next: Async handler suspended during DB I/O
   DB-->>Pool: Inserted row
-  Pool-->>Node: result.rows[0]
-  Node-->>Client: 201 + new task JSON
+  Pool-->>Next: result.rows[0]
+  Next-->>Client: 201 + new task JSON
 ```
 
 ## 2. Install and create a database (15 min)
@@ -75,124 +75,163 @@ psql -d minitrack -f backend/sql/schema.sql
 psql -d minitrack -c 'SELECT id, title, done FROM tasks ORDER BY id;'
 ```
 
-If authentication fails, use `psql -h localhost -U YOUR_USER -d minitrack` and set the matching credentials in `.env` below. The schema is re-runnable; it does not wipe your tasks.
+If authentication fails, use `psql -h localhost -U YOUR_USER -d minitrack` and set the matching credentials in `frontend/.env.local` below. The schema is re-runnable; it does not wipe your tasks.
 
 **Why identity IDs?** PostgreSQL allocates IDs, not each Node instance; sequence values can have gaps. **Why BIGINT?** Supports more IDs, but `pg` gives BIGINT values as strings by default to avoid unsafe JavaScript integer conversion.
 
-## 3. Configure the Node database driver (15 min)
+## 3. Configure TypeScript and the database driver (15 min)
 
 From repository root:
 
 ```bash
-cd backend
+cd frontend
 npm install
-cp .env.example .env
+cp .env.local.example .env.local
 # Edit DATABASE_URL to match your role/password:
 # postgresql://YOUR_MAC_USER@localhost:5432/minitrack
 ```
 
-Write `backend/src/db.js`:
+Create `frontend/lib/` if it does not exist, then write `frontend/lib/db.ts`:
 
-```js
-const { Pool } = require('pg');
-require('dotenv').config();
+```ts
+import 'server-only';
+import { Pool } from 'pg';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is missing. Copy backend/.env.example to .env and edit it.');
+const globalForPg = globalThis as typeof globalThis & { taskPool?: Pool };
+
+export function getPool(): Pool {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is missing. Copy frontend/.env.local.example to .env.local and edit it.');
+  }
+  globalForPg.taskPool ??= new Pool({ connectionString, max: 5 });
+  return globalForPg.taskPool;
 }
-
-// A Pool reuses a limited number of database connections across HTTP requests.
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
-module.exports = { pool };
 ```
 
+The `server-only` import prevents this database module from being included in Client Components. The global pool guard avoids creating a new pool on every Next.js development reload.
 
 **Why a pool?** Keeping a small number of reusable PostgreSQL connections is cheaper than making a new connection for each HTTP request. The pool also limits simultaneous database connections.
 
-## 4. Replace Day 2's in-memory server (25 min)
+## 4. Add the task type and database functions (15 min)
 
-Write this into `backend/src/server.js` (its source is also in `checkpoints/day3/server.js` if you need to compare):
+Create `frontend/app/types.ts`. `pg` returns `BIGINT` IDs as strings, and the API sends timestamps as ISO strings:
 
-```js
-const http = require('node:http');
-require('dotenv').config(); // Reads DATABASE_URL and PORT from backend/.env.
-const { pool } = require('./db'); // A reusable PostgreSQL connection pool.
-
-const PORT = Number(process.env.PORT || 3001);
-
-function sendJson(res, status, value) {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(value));
-}
-
-function readJson(req) {
-  return new Promise((resolve, reject) => {
-    let raw = '';
-    req.setEncoding('utf8');
-    req.on('data', chunk => {
-      raw += chunk;
-      if (raw.length > 10_000) {
-        reject(Object.assign(new Error('Body too large'), { status: 413 }));
-        req.destroy();
-      }
-    });
-    req.on('end', () => {
-      try { resolve(JSON.parse(raw)); }
-      catch { reject(Object.assign(new Error('Invalid JSON'), { status: 400 })); }
-    });
-    req.on('error', reject);
-  });
-}
-
-http.createServer(async (req, res) => {
-  try {
-    if (req.method === 'GET' && req.url === '/tasks') {
-      // Await relinquishes the JS thread while PostgreSQL works.
-      const result = await pool.query('SELECT id, title, done, created_at FROM tasks ORDER BY id');
-      sendJson(res, 200, result.rows);
-      return;
-    }
-    if (req.method === 'POST' && req.url === '/tasks') {
-      const body = await readJson(req);
-      const title = typeof body?.title === 'string' ? body.title.trim() : '';
-      if (!title || title.length > 200) {
-        sendJson(res, 400, { error: 'Title must be 1–200 characters' });
-        return;
-      }
-      // $1 is a bound parameter: do not splice user input into SQL text.
-      const result = await pool.query(
-        'INSERT INTO tasks (title) VALUES ($1) RETURNING id, title, done, created_at',
-        [title]
-      );
-      sendJson(res, 201, result.rows[0]);
-      return;
-    }
-    sendJson(res, 404, { error: 'Not found' });
-  } catch (error) {
-    console.error(error); // Log diagnostic details on server, not to the client.
-    if (!res.headersSent && !res.destroyed) {
-      sendJson(res, error.status || 500, {
-        error: error.status ? error.message : 'Internal server error'
-      });
-    }
-  }
-}).listen(PORT, () => console.log(`API: http://localhost:${PORT}`));
+```ts
+export type Task = {
+  id: string;
+  title: string;
+  done: boolean;
+  created_at: string;
+};
 ```
 
+Create `frontend/lib/tasks.ts`. Start with the two operations used today, `listTasks` and `createTask`:
 
-Run from the `backend` directory:
+```ts
+import type { Task } from '../app/types';
+import { getPool } from './db';
+
+type TaskRow = Omit<Task, 'created_at'> & { created_at: Date };
+
+function toTask(row: TaskRow): Task {
+  return { ...row, created_at: row.created_at.toISOString() };
+}
+
+export async function listTasks(): Promise<Task[]> {
+  const result = await getPool().query<TaskRow>(
+    'SELECT id, title, done, created_at FROM tasks ORDER BY id'
+  );
+  return result.rows.map(toTask);
+}
+
+export async function createTask(title: string): Promise<Task> {
+  const result = await getPool().query<TaskRow>(
+    'INSERT INTO tasks (title) VALUES ($1) RETURNING id, title, done, created_at',
+    [title]
+  );
+  const row = result.rows[0];
+  if (!row) throw new Error('Inserted task was not returned by PostgreSQL');
+  return toTask(row);
+}
+```
+
+`$1` is a parameter placeholder; the title is sent separately from the SQL text. `TaskRow` describes the database timestamp as a `Date`, and `toTask` converts it to a JSON-friendly string.
+
+Create `frontend/lib/validation.ts`. Request JSON is untrusted, so accept `unknown` and narrow it before reading properties:
+
+```ts
+export function normalizeTitle(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const title = value.trim();
+  return title.length >= 1 && title.length <= 200 ? title : null;
+}
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+```
+
+## 5. Add typed Route Handlers (15 min)
+
+The Day 1–2 checkpoint servers taught the built-in Node HTTP lifecycle. In the actual Next.js app, use **Route Handlers** instead of starting another server. Create `frontend/app/api/tasks/route.ts`; Next maps exported HTTP-method functions to `/api/tasks`:
+
+```ts
+import { createTask, listTasks } from '../../../lib/tasks';
+import { isRecord, normalizeTitle } from '../../../lib/validation';
+
+export async function GET(): Promise<Response> {
+  try {
+    return Response.json(await listTasks(), {
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  } catch (error: unknown) {
+    console.error('GET /api/tasks failed:', error);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+  if (!title) {
+    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+  }
+  try {
+    return Response.json(await createTask(title), { status: 201 });
+  } catch (error: unknown) {
+    console.error('POST /api/tasks failed:', error);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+```
+
+Also create `frontend/app/api/health/route.ts`:
+
+```ts
+export function GET(): Response {
+  return Response.json({ ok: true });
+}
+```
+
+Run the app from `frontend`:
 
 ```bash
 npm run dev
-# In a second terminal:
-curl -i http://localhost:3001/tasks
-curl -i -X POST http://localhost:3001/tasks \
+# In another terminal:
+curl -i http://localhost:3000/api/tasks
+curl -i -X POST http://localhost:3000/api/tasks \
   -H 'Content-Type: application/json' -d '{"title":"Persist in PostgreSQL"}'
 ```
 
-Stop/restart the backend and GET again. **The task should still exist.**
+Stop/restart Next.js and GET again. **The task should still exist.** The API and page run in the same Next.js server; PostgreSQL is the persistent store.
 
-## 5. SQL and interview drill (25 min)
+## 6. SQL and interview drill (25 min)
 
 Try:
 
@@ -209,13 +248,13 @@ SELECT COUNT(*) FROM tasks WHERE done = FALSE;
 2. **Why `RETURNING`?** Return generated ID and defaults without a second query.
 3. **Is the database ID guaranteed gap-free?** No. Uniqueness and consecutive numbering are different requirements.
 4. **What if the pool is full?** Additional requests wait for a free connection; configure limits/timeouts for real systems.
-5. **Why use `await pool.query`?** Node can handle other work while waiting for DB I/O.
+5. **Why use `await pool.query`?** The Route Handler pauses while PostgreSQL works, without blocking the JavaScript event loop from handling other requests.
 6. **What if Postgres goes down?** Query rejects, handler catches it and returns a server error; production systems need logging, timeouts and recovery plans.
 
 ## Exit checklist
 
 - [ ] Schema created; GET reads from Postgres.
-- [ ] POST survives backend restart.
+- [ ] POST survives Next.js restart.
 - [ ] I understand $1 parameters, pooling, and BIGINT strings.
 
 **Commit:** `git add . && git commit -m "day3: persist in Postgres"`

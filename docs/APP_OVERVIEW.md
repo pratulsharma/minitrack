@@ -1,8 +1,8 @@
 # MiniTrack — Application Overview
 
-> **Project:** MiniTrack · **Stack:** Next.js + React + TypeScript, Node.js, PostgreSQL  
+> **Project:** MiniTrack · **Stack:** Next.js + React + TypeScript, PostgreSQL
 > **Purpose:** Learn full-stack engineering by building a tiny, useful application and practicing interview questions against real code.  
-> **Status:** Product plan. The screenshots below are **design mockups**, not screenshots of an implemented application.
+> **Status:** The dark mockups below are design references. The task list is implemented; sign-in/profile screens remain planned.
 
 ## 1. What are we building?
 
@@ -12,13 +12,13 @@ Think of it as a deliberately tiny version of Trello or Jira **without** boards,
 
 **Example:** While preparing for interviews, you add *Practice React hooks*, *Build a Node.js endpoint*, and *Practice SQL joins*. As you finish a task, you check it off. When the list grows, you filter for unfinished tasks or search for *SQL*.
 
-The application is kept simple so that the interesting complexity is in **JavaScript, Node.js, React, SQL, HTTP, testing, and system design**, not in implementing an elaborate product.
+The application is kept simple so that the interesting complexity is in **JavaScript, TypeScript, Node.js fundamentals, React, SQL, HTTP, testing, and system design**, not in implementing an elaborate product.
 
 ## 2. What does the app look like?
 
 ### Screen A — My tasks (main screen)
 
-![Proposed task list screen](assets/01-task-list.png)
+![Dark task list mockup](assets/01-task-list-dark.svg)
 
 **What a user can do:** View tasks, see completed/open state, and (after the initial lessons) add a new task or open edit/delete actions.
 
@@ -26,7 +26,7 @@ The application is kept simple so that the interesting complexity is in **JavaSc
 
 ### Screen B — Edit a task
 
-![Proposed edit task dialog](assets/02-edit-task.png)
+![Dark edit-task dialog mockup](assets/02-edit-task-dark.svg)
 
 **What a user can do:** Change an existing task title and save.
 
@@ -34,7 +34,7 @@ The application is kept simple so that the interesting complexity is in **JavaSc
 
 ### Screen C — Search and filter
 
-![Proposed search and filter screen](assets/03-search-filter.png)
+![Dark search and filter mockup](assets/03-search-filter-dark.svg)
 
 **What a user can do:** Search for `SQL` and show only open tasks.
 
@@ -42,7 +42,7 @@ The application is kept simple so that the interesting complexity is in **JavaSc
 
 ### Screen D — Sign in (later module)
 
-![Proposed sign-in screen](assets/04-sign-in.png)
+![Dark sign-in screen mockup](assets/04-sign-in-dark.svg)
 
 **What a user can do:** Sign in and access tasks belonging to their account.
 
@@ -54,14 +54,21 @@ The application is kept simple so that the interesting complexity is in **JavaSc
 
 | Capability | User experience | When |
 |---|---|---|
-| View tasks | Open the page and see stored tasks | Days 1–4 (end-to-end read path) |
-| Create a task via API | Send a POST request to add a task | Day 2 with memory, Day 3 with PostgreSQL |
-| Add a task through the webpage | Type title and click Add | After Day 4 |
-| Complete / reopen | Check or uncheck a task | Early next lessons |
-| Edit / delete | Rename or remove tasks | After basic create/read |
-| Search / filter | Find matching tasks; show open vs. done | Mid-course |
-| Sign in | Show each person's own tasks | Later backend module |
-| Handle conflicting edits | Avoid silently overwriting changes | Advanced interview module |
+| View tasks | Open the page and see stored tasks | App Days 1–4 (end-to-end read path) |
+| Create a task via API | Send a POST request to add a task | App Day 2 with memory, App Day 3 with PostgreSQL |
+| Add a task through the webpage | Type title and click Add | App Day 5 |
+| Complete / reopen | Check or uncheck a task | App Day 5 |
+| Edit / delete | Rename or remove a task | App Days 5–7 |
+| Search / filter | Find matching tasks; show open vs. done | App Day 8 |
+| Automated testing | Verify routes, database integration, UI flow, and access rules | App Days 9 and 12 |
+| Sign in | Authenticate with a maintained provider | App Day 10 |
+| Per-user task ownership | Show each person only their own tasks | App Days 11–12 |
+| Responsive and accessible UI | Use the tracker across screen sizes and input modes | App Day 13 |
+| Deploy | Run the application with production services | App Days 14–15 |
+| Handle conflicting edits | Avoid silently overwriting changes | Optional advanced module |
+
+For the complete day-by-day steps, progress checkboxes, concepts, and interview
+questions, see the [Complete MiniTrack app roadmap](APP_BUILD_ROADMAP.md).
 
 ## 4. Example user journey
 
@@ -79,36 +86,32 @@ The application is kept simple so that the interesting complexity is in **JavaSc
 Browser
   |
   v
-Next.js / React frontend  (port 3000 during local development)
-  |
-  | HTTP requests (e.g. GET /tasks, POST /tasks)
-  v
-Node.js backend API      (port 3001 during local development)
+Next.js app (UI + TypeScript Route Handlers, port 3000)
   |
   | SQL with parameterized queries
   v
 PostgreSQL database
 ```
 
-**When reading tasks:** Next.js requests data from Node.js → Node.js runs a PostgreSQL `SELECT` → Node returns JSON → Next.js renders the task list. The initial Day 4 page uses a **Server Component** to fetch data.
+**When reading tasks:** the Next.js Server Component calls a server-only task function → `pg` runs a PostgreSQL `SELECT` → Next renders the task list. It does not need to make an HTTP request back to its own app.
 
-**When creating tasks:** The user submits a title → the frontend sends an HTTP POST → the Node.js API runs a PostgreSQL `INSERT` → the API returns the new task → the frontend updates or refreshes the displayed list.
+**When creating tasks:** the user submits a title → the browser sends same-origin `POST /api/tasks` → a Next.js Route Handler validates and calls a server-only task function → PostgreSQL runs a parameterized `INSERT` → the Route Handler returns the new task → the frontend refreshes the displayed list.
 
 ### Example API (target, added incrementally)
 
 | Request | Purpose |
 |---|---|
-| `GET /tasks` | Read tasks |
-| `POST /tasks` | Add a task |
-| `PATCH /tasks/:id` | Edit task title or completion status |
-| `DELETE /tasks/:id` | Delete a task |
-| `GET /tasks?search=sql&status=open` | Search and filter (later) |
+| `GET /api/tasks` | Read tasks |
+| `POST /api/tasks` | Add a task |
+| `PATCH /api/tasks/:id` | Edit task title or completion status |
+| `DELETE /api/tasks/:id` | Delete a task |
+| `GET /api/tasks?search=sql&status=open` | Search and filter (later) |
 
 Example task response:
 
 ```json
 {
-  "id": 3,
+  "id": "3",
   "title": "Practice SQL joins",
   "done": false
 }
@@ -121,10 +124,10 @@ The task representation and API routes may evolve as we learn; we'll document me
 | Technology | Why we're using it | What we'll avoid initially |
 |---|---|---|
 | **Next.js + React + TypeScript** | Learn rendering, hooks, component boundaries, SSR vs. client behavior | Complex CSS, heavy UI libraries |
-| **Node.js built-in HTTP first** | Understand the raw request/response lifecycle and streams | Hiding fundamentals behind a framework immediately |
-| **Fastify later** | Learn how production API frameworks organize routes and errors | Premature abstractions |
+| **Node.js built-in HTTP in checkpoints** | Understand the raw request/response lifecycle and streams before using a framework | Hiding fundamentals behind a framework immediately |
+| **Next.js Route Handlers** | Implement a TypeScript API in the same app as the UI | Maintaining a separate local API server for a single Next.js project |
 | **PostgreSQL + `pg`** | Learn real SQL, transactions, safe parameterized queries and pooling | Starting with an ORM |
-| **Separate frontend and backend** | Makes the network boundary explicit for full-stack interviews | Microservices and containers as prerequisites |
+| **Same-origin UI and API** | Keep browser HTTP requests visible without local CORS configuration | Microservices and containers as prerequisites |
 
 ## 7. First four learning days
 
@@ -132,10 +135,12 @@ The task representation and API routes may evolve as we learn; we'll document me
 |---|---|---|---|
 | **1** | `GET /tasks` returns sample JSON | JS event loop, HTTP server, request/response | Why does a Promise run before a timer? What if `res.end()` is missing? |
 | **2** | `POST /tasks` adds an in-memory task | Request streams, `async/await`, closures, errors | How does Node parse a request body? What does `await` actually do? |
-| **3** | Tasks persist in PostgreSQL | SQL, parameters, connection pools | Why parameterize queries? What happens when the pool is exhausted? |
-| **4** | Next.js displays tasks from database | React and Next.js Server Components, `fetch` | What is SSR? Why doesn't `fetch` reject on an HTTP 500? |
+| **3** | TypeScript Route Handlers persist tasks in PostgreSQL | SQL, parameters, connection pools, route handlers | Why parameterize queries? What happens when the pool is exhausted? |
+| **4** | Next.js Server Component displays database tasks | React and Next.js Server Components, server-only database access | Why avoid a server-to-self HTTP request? |
 
-**Important:** Authentication, edit dialogs, search and advanced state patterns come **later**. The first four days establish one working read/write backend and a simple read-only frontend, not a finished product.
+Days 1–5 are the Week 1 MVP track. The complete app roadmap continues through
+Day 15 with editing, search, testing, sign-in, user-data isolation, accessibility,
+and deployment. The repository's Python DSA days are a separate learning track.
 
 ## 8. What we're intentionally NOT building
 
@@ -150,7 +155,7 @@ Advanced ideas can be **small isolated interview exercises** instead of new prod
 
 | Simple feature | Important concepts and tricky questions |
 |---|---|
-| Fetch tasks | HTTP lifecycle; SSR vs. CSR; Server vs. Client Components; `fetch` errors |
+| Read tasks | SSR vs. CSR; Server vs. Client Components; server-only database access |
 | Create task | POST vs. PUT; JSON parsing; idempotency; duplicate requests |
 | Edit task | React closures and state; lost updates; optimistic locking |
 | Query database | SQL injection; connection pooling; indexes; query plans |

@@ -1,4 +1,15 @@
 import type { ReactNode } from 'react';
+import './globals.css';
+
+export const metadata = {
+  title: 'MiniTrack — Simple tasks, serious focus',
+  description: 'A focused task tracker for your daily work.',
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return <html lang="en"><body style={{fontFamily: 'system-ui, sans-serif', maxWidth: 740, margin: '48px auto', padding: '0 16px'}}>{children}</body></html>;
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
 }

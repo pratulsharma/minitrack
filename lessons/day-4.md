@@ -2,19 +2,17 @@
 
 **Goal:** open `http://localhost:3000` and see PostgreSQL tasks. **Time:** ~90 min. **Today:** `frontend/app/types.ts`, `frontend/app/layout.tsx`, `frontend/app/page.tsx`. **Next:** [Day 5](day-5.md).
 
-## 1. Why a separate Next.js frontend? (15 min)
+## 1. Read database data in a Server Component (15 min)
 
-We already built Node HTTP endpoints to learn the backend. Next.js will consume them, making the boundary clear. A **Server Component** fetches the initial list on the Next server; it does not need `useEffect` just to fetch on page load. We'll add browser events on Day 5.
+The Day 1–2 checkpoint servers taught the built-in Node HTTP lifecycle. From Day 3 onward the app uses Next.js Route Handlers and a PostgreSQL connection pool. A **Server Component** can call server-only database code directly for its initial data; it does not need `useEffect` or an HTTP request back to its own app.
 
 ### Browser-to-database flow
 
 ```mermaid
 flowchart LR
   Browser[Browser GET /] --> Next[Next.js Server Component]
-  Next -->|GET /tasks| Node[Node.js API]
-  Node -->|SELECT| DB[(PostgreSQL)]
-  DB --> Node
-  Node -->|JSON| Next
+  Next -->|SELECT via pg| DB[(PostgreSQL)]
+  DB --> Next
   Next -->|HTML and React payload| Browser
 ```
 
@@ -24,34 +22,31 @@ flowchart LR
 sequenceDiagram
   participant Browser
   participant Next as Next.js server
-  participant API as Node.js API
   participant DB as PostgreSQL
   Browser->>Next: GET /
-  Next->>API: GET /tasks (server-side fetch)
-  API->>DB: SELECT tasks
-  DB-->>API: Rows
-  API-->>Next: 200 + JSON tasks
+  Next->>DB: SELECT tasks via pg
+  DB-->>Next: Rows
   Next-->>Browser: HTML + React Server Component payload
   Note over Browser: Displays list (no client mutation yet)
 ```
 
 ## 2. Install and start the Next.js project (15 min)
 
-**Leave Day 3 backend running in terminal A.** In terminal B, from repo root:
+From the repository root, configure the database URL if you have not already, then run Next.js:
 
 ```bash
 cd frontend
 npm install
 cp .env.local.example .env.local
-# API_BASE_URL is read by the Next.js server, not exposed to browser code.
+# Set DATABASE_URL in .env.local; it is server-only.
 npm run dev
 ```
 
 This package already has `frontend/package.json` and a minimal Next App Router setup. You do **not** need `create-next-app` again.
 
-## 3. Define the shape of a task (10 min)
+## 3. Review the task type (5 min)
 
-Write `frontend/app/types.ts`:
+Day 3 created `frontend/app/types.ts` for the database-backed API. Read it again before using it here; you do not need to recreate it:
 
 ```ts
 export type Task = {
@@ -81,21 +76,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 Then write `frontend/app/page.tsx`:
 
 ```tsx
-// Server Component: the initial data fetch happens on the Next.js server.
-// It can read API_BASE_URL without exposing a secret to the browser bundle.
+import { listTasks } from '../lib/tasks';
 import type { Task } from './types';
 
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
-  const api = process.env.API_BASE_URL || 'http://localhost:3001';
   let tasks: Task[] = [];
   let error = '';
 
   try {
-    // For teaching, always fetch current rows instead of caching the response.
-    const response = await fetch(`${api}/tasks`, { cache: 'no-store' });
-    // fetch does not reject on 404/500; check the HTTP status explicitly.
-    if (!response.ok) throw new Error(`API returned HTTP ${response.status}`);
-    tasks = (await response.json()) as Task[];
+    tasks = await listTasks();
   } catch (err) {
     error = err instanceof Error ? err.message : 'Unknown error';
   }
@@ -115,13 +106,13 @@ export default async function Home() {
 ```
 
 
-Open `http://localhost:3000`. Expected: a `MiniTrack` heading, task count, and task list; the list comes from Postgres by way of Next → Node.
+Open `http://localhost:3000`. Expected: a `MiniTrack` heading, task count, and task list; the Server Component reads from PostgreSQL through the typed `pg` helper.
 
 ## 5. Debug + interview (25 min)
 
-- Stop Node while Next stays on. Reload: you should get an error paragraph rather than a blank app. Restart Node.
-- Insert a task via `curl POST /tasks`; reload the browser. It should appear.
-- Remove `if (!response.ok)` and explore why `fetch` does not reject just because a server replied 500.
+- Stop Next.js and observe that the page is unavailable; restart it.
+- Insert a task through `POST /api/tasks`; reload the browser. It should appear.
+- Compare this direct database call with calling your own app through `fetch`. Why can a Server Component avoid that extra HTTP hop?
 
 **Q1. Server vs Client Component?** Server Components fetch/compose server-side data; Client Components are needed for interactive hooks/event handlers. Client Components can still have server-rendered HTML on initial load.
 
@@ -129,7 +120,7 @@ Open `http://localhost:3000`. Expected: a `MiniTrack` heading, task count, and t
 
 **Q3. Why isn't this a `useEffect` fetch?** Initial data is available on the server; fewer loading states and a clearer server data boundary.
 
-**Q4. What does `cache: 'no-store'` do?** Requests fresh data rather than using the fetch cache in this teaching setup.
+**Q4. Why read PostgreSQL directly from a Server Component?** It avoids an unnecessary server-to-self HTTP request. The Route Handler remains available for browser requests and external clients.
 
 **Q5. Why keep secrets out of browser code?** Anything bundled for the client can be inspected; use non-public env vars only on the server.
 
@@ -139,7 +130,7 @@ Open `http://localhost:3000`. Expected: a `MiniTrack` heading, task count, and t
 
 - [ ] Page shows tasks from PostgreSQL.
 - [ ] Task count changes after curl POST + browser refresh.
-- [ ] I can explain each hop in the sequence diagram.
+- [ ] I can explain each hop in the sequence diagram and distinguish direct server data access from an HTTP Route Handler.
 
 **Commit:** `git add . && git commit -m "day4: show tasks in Next"`
 

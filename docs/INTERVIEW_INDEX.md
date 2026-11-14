@@ -7,10 +7,11 @@
 | Node-specific `nextTick` | `lessons/day-02.md` | What is the Node-specific queue nuance? |
 | Promise / async-await | `lessons/day-02.md` | What is the difference between awaiting and blocking? |
 | Closures | `lessons/day-02.md`, `exercises/js-predictions.js` | What variables does a returned function retain? |
-| HTTP / status codes | `checkpoints/day1/server.cjs`, `backend/src/server.js` | Why 200 vs. 201 vs. 404? |
-| JSON request body stream | `checkpoints/day2/server.cjs`, `backend/src/server.js` | Why must you asynchronously read POST body? |
-| SQL injection / placeholders | `backend/src/tasks.js`, `lessons/day-03.md` | Why `$1` instead of concatenating values? |
-| Connection pooling | `backend/src/db.js` | Why reuse connections? What if pool exhausted? |
+| HTTP / status codes | `checkpoints/day1/server.cjs`, `frontend/app/api/tasks/route.ts` | Why 200 vs. 201 vs. 404? |
+| JSON request body stream | `checkpoints/day2/server.cjs`, `frontend/app/api/tasks/route.ts` | How does a Route Handler parse JSON? |
+| Next.js Route Handlers | `frontend/app/api/` | How do HTTP methods map to exported functions? |
+| SQL injection / placeholders | `frontend/lib/tasks.ts`, `lessons/day-03.md` | Why `$1` instead of concatenating values? |
+| Connection pooling | `frontend/lib/db.ts` | Why reuse connections? What if pool exhausted? |
 | Server vs Client Component | `frontend/app/page.tsx`, `frontend/app/TaskBoard.tsx` | Which code runs on server vs browser? |
 | Controlled input / state | `frontend/app/TaskBoard.tsx` | Why not mutate `tasks` array directly? |
 | `router.refresh()` | `frontend/app/TaskBoard.tsx` | What happens after mutation? |
