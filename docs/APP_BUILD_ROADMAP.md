@@ -12,7 +12,9 @@ your own progress.
 
 **Important:** The repository has full-stack app lessons for Days 1–15. The
 canonical Python DSA track uses `dsa-python/lessons/dsa-day-XX.md` filenames so
-it does not collide with the app sequence.
+it does not collide with the app sequence. Days 16–25 below are an optional
+infrastructure and scaling track; detailed lesson files have not been written
+yet.
 
 ## What “the whole app is finished” means
 
@@ -47,6 +49,21 @@ work.
 | 15 | Verify, document, and launch the complete app | [ ] Not started |
 
 Update the Progress column as you go: change `[ ] Not started` to `[x] Done`.
+
+### Optional infrastructure and scaling track
+
+| Day | Main milestone | Progress |
+|---|---|---|
+| 16 | Build a secure production Docker image | [ ] Not started |
+| 17 | Run the complete local stack with Docker Compose | [ ] Not started |
+| 18 | Add a continuous integration pipeline | [ ] Not started |
+| 19 | Measure and optimize PostgreSQL queries and pagination | [ ] Not started |
+| 20 | Plan database connection, replica, backup, and failover scaling | [ ] Not started |
+| 21 | Add measured caching with explicit invalidation | [ ] Not started |
+| 22 | Load test and add logs, metrics, and traces | [ ] Not started |
+| 23 | Scale stateless app instances behind a load balancer | [ ] Not started |
+| 24 | Run MiniTrack on local Kubernetes | [ ] Not started |
+| 25 | Build a delivery pipeline and run resilience drills | [ ] Not started |
 
 ---
 
@@ -921,6 +938,441 @@ documentation as an interface; privacy-aware logging; end-to-end system tracing.
 
 ---
 
+## Optional Day 16 — Build a production Docker image
+
+**Milestone:** The tested Next.js application runs in a small, non-root,
+reproducible container image.
+
+### Steps and substeps
+
+- [ ] **1. Define the container boundary**
+  - Enable Next.js standalone output and identify build-time versus runtime files.
+  - Add `.dockerignore` entries for dependencies, build output, local environment files, logs, and test artifacts.
+- [ ] **2. Write a multi-stage Dockerfile**
+  - Separate dependency installation, build, and runtime stages.
+  - Copy only production runtime output into the final image.
+  - Run as a non-root user and expose the application port.
+- [ ] **3. Keep configuration external**
+  - Inject `DATABASE_URL`, Auth.js variables, and service URLs at runtime.
+  - Never copy `.env.local` or secrets into an image layer.
+- [ ] **4. Verify the image**
+  - Build with a deterministic tag and run it against a non-production database.
+  - Check image size, startup, health, graceful shutdown, and container logs.
+  - Scan the image and explain any accepted finding.
+
+### Concepts to know
+
+Images versus containers; build layers; multi-stage builds; immutable artifacts;
+non-root execution; runtime configuration; signals; supply-chain scanning.
+
+### Interview questions
+
+1. **Why use a multi-stage build?** — Build tools stay out of the runtime
+   image, reducing size and attack surface.
+2. **Why must secrets stay out of image layers?** — Deleted or overwritten
+   files can remain recoverable from prior immutable layers.
+3. **What does graceful shutdown require?** — The process must receive the
+   termination signal, stop accepting work, finish bounded in-flight requests,
+   and close database connections.
+
+---
+
+## Optional Day 17 — Run the local stack with Docker Compose
+
+**Milestone:** One command starts Next.js, PostgreSQL, migrations, and durable
+local data with explicit health dependencies.
+
+### Steps and substeps
+
+- [ ] **1. Define services and networking**
+  - Add app and PostgreSQL services on a private Compose network.
+  - Use the database service name, not `localhost`, in the container connection URL.
+- [ ] **2. Persist database data**
+  - Mount a named volume for PostgreSQL.
+  - Document how to reset only the learning database deliberately.
+- [ ] **3. Add health checks and migrations**
+  - Check PostgreSQL readiness before migrations.
+  - Run migrations as a one-shot service, not from every app replica.
+  - Start the app only after the required schema is ready.
+- [ ] **4. Use environment-specific configuration**
+  - Keep a committed example file containing names and safe placeholders.
+  - Keep real values in ignored files or a supported secrets mechanism.
+- [ ] **5. Verify lifecycle behavior**
+  - Start, stop, rebuild, and restart the stack.
+  - Confirm task data survives ordinary container recreation.
+
+### Concepts to know
+
+Compose services; DNS-based discovery; volumes; health checks; startup order
+versus readiness; one-shot jobs; development parity.
+
+### Interview questions
+
+1. **Why does `localhost` fail between containers?** — It points to the
+   current container, not another service.
+2. **Why use a named volume?** — Container filesystems are disposable; the
+   volume gives PostgreSQL an explicit durable lifecycle.
+3. **Why not run migrations in every app container?** — Concurrent migration
+   attempts can race and make rollout behavior unpredictable.
+
+---
+
+## Optional Day 18 — Add continuous integration
+
+**Milestone:** Every proposed change runs repeatable quality and security gates
+before it can be merged.
+
+### Steps and substeps
+
+- [ ] **1. Create a CI workflow**
+  - Trigger on pull requests and protected-branch pushes.
+  - Use the repository's pinned Node version and `npm ci`.
+- [ ] **2. Split useful jobs**
+  - Run lint, unit tests, type checking, and production build.
+  - Start an isolated PostgreSQL service for migration and integration tests.
+  - Run browser tests only after the application and database are ready.
+- [ ] **3. Cache safely**
+  - Cache package-manager downloads, not `node_modules` or secret-bearing output.
+  - Key caches from the lockfile and runtime version.
+- [ ] **4. Handle artifacts and secrets**
+  - Upload failure traces only when useful and control their retention.
+  - Use test-only credentials; never expose production OAuth or database secrets.
+- [ ] **5. Enforce the gate**
+  - Require successful jobs before merge.
+  - Cancel superseded runs and keep failures actionable.
+
+### Concepts to know
+
+Continuous integration; reproducible installation; service containers; job
+dependencies; artifacts; cache keys; branch protection; least-privilege tokens.
+
+### Interview questions
+
+1. **What belongs in CI?** — Fast, deterministic checks that provide useful
+   evidence before merge, with slower suites separated deliberately.
+2. **Why use `npm ci`?** — It installs exactly from the lockfile and fails when
+   the manifest and lockfile disagree.
+3. **What is the difference between a cache and an artifact?** — A cache speeds
+   later work and may disappear; an artifact is retained output from a run.
+
+---
+
+## Optional Day 19 — Measure PostgreSQL query performance
+
+**Milestone:** Search, owner-scoped listing, and pagination have measured query
+plans and indexes justified by representative data.
+
+### Steps and substeps
+
+- [ ] **1. Create a representative dataset**
+  - Generate enough users and tasks to reveal scan and sort behavior.
+  - Keep generated load-test data out of personal and production databases.
+- [ ] **2. Inspect real plans**
+  - Run `EXPLAIN (ANALYZE, BUFFERS)` for owner list, status filter, title search, and task mutation queries.
+  - Record rows estimated versus rows observed, scan type, sort, and buffer activity.
+- [ ] **3. Add only justified indexes**
+  - Compare composite indexes such as `(owner_id, done, id)`.
+  - Evaluate `pg_trgm` for leading-wildcard `ILIKE` search.
+  - Measure write and storage cost after each index.
+- [ ] **4. Add cursor pagination**
+  - Replace unbounded result sets with a stable order and bounded page size.
+  - Use an `(owner_id, id)` cursor predicate rather than large offsets.
+- [ ] **5. Re-measure**
+  - Store before/after plans and latency with the same data and query shape.
+
+### Concepts to know
+
+Query plans; sequential and index scans; composite and covering indexes;
+cardinality estimates; buffer reads; cursor versus offset pagination; trigrams.
+
+### Interview questions
+
+1. **Why not add indexes to every column?** — Indexes consume storage and make
+   writes, vacuuming, and maintenance more expensive.
+2. **Why can `%term%` bypass a B-tree?** — A leading wildcard removes the
+   ordered prefix a normal B-tree search depends on.
+3. **Why prefer cursor pagination at scale?** — It avoids scanning and
+   discarding an ever-growing offset and behaves more predictably under inserts.
+
+---
+
+## Optional Day 20 — Scale PostgreSQL connections and availability
+
+**Milestone:** Database capacity, connection budgets, backups, replicas, and
+failure expectations are documented and tested without premature sharding.
+
+### Steps and substeps
+
+- [ ] **1. Calculate the connection budget**
+  - Multiply app replicas by per-process pool maximum and include migrations,
+    administration, and monitoring connections.
+  - Keep the total below the provider limit with safety margin.
+- [ ] **2. Add timeouts and backpressure**
+  - Configure connection acquisition, statement, and idle transaction timeouts.
+  - Return explicit overload errors rather than allowing unbounded queues.
+- [ ] **3. Evaluate connection proxies**
+  - Use a managed pooler or PgBouncer when many ephemeral instances would
+    otherwise exhaust PostgreSQL connections.
+  - Verify session features are compatible with the selected pooling mode.
+- [ ] **4. Understand read replicas**
+  - Route only safe read workloads to replicas.
+  - Document replication lag and read-after-write consistency requirements.
+- [ ] **5. Prove recovery**
+  - Configure backups or provider restore points.
+  - Perform a restore drill and record recovery point and recovery time.
+  - Understand automatic failover before claiming high availability.
+
+### Concepts to know
+
+Connection budgets; backpressure; PgBouncer; read replicas; replication lag;
+primary failover; backups; point-in-time recovery; RPO and RTO.
+
+### Interview questions
+
+1. **Why can adding app replicas overload PostgreSQL?** — Each process can open
+   its own pool, multiplying total connections and concurrent queries.
+2. **When is a read replica unsafe?** — When a request requires immediate
+   read-after-write consistency and the replica may lag.
+3. **Why is a backup not proven until restored?** — Configuration or retained
+   data may be incomplete; a restore drill verifies the recovery path.
+
+> Sharding is intentionally deferred. First exhaust query design, indexes,
+> pagination, pooling, vertical capacity, replicas, and data-lifecycle options.
+
+---
+
+## Optional Day 21 — Add caching with explicit invalidation
+
+**Milestone:** One measured read path uses a correctly scoped cache, mutations
+invalidate it, and the app remains correct when the cache is unavailable.
+
+### Steps and substeps
+
+- [ ] **1. Choose a cacheable problem**
+  - Measure before adding a cache.
+  - Prefer shared, expensive, read-heavy data; task lists may be a teaching
+    example but are highly user-specific and mutation-heavy.
+- [ ] **2. Define keys and lifetime**
+  - Include owner identity, filters, pagination cursor, and schema/version
+    information in private-data keys.
+  - Set a bounded TTL and document acceptable staleness.
+- [ ] **3. Implement cache-aside behavior**
+  - Read cache, fall back to PostgreSQL, then populate on success.
+  - Invalidate or update affected keys after create, edit, complete, and delete.
+- [ ] **4. Prevent correctness and security bugs**
+  - Never share one user's cached response with another user.
+  - Avoid caching error responses or partial authorization results.
+  - Mitigate stampedes with bounded request coalescing where justified.
+- [ ] **5. Test failure modes**
+  - Stop Redis or the selected cache and verify PostgreSQL remains the source of truth.
+  - Compare hit rate, p95 latency, database queries, and operational cost.
+
+### Concepts to know
+
+Cache-aside; TTL; invalidation; key design; cache stampede; stale data;
+distributed caches; private-data isolation; hit rate.
+
+### Interview questions
+
+1. **What are the two hard problems in caching?** — Invalidation and knowing
+   what data belongs in which key/identity boundary.
+2. **Why is owner identity part of the key?** — Without it, cached private data
+   can leak across users.
+3. **Should cache failure take down the app?** — Usually no for cache-aside
+   reads; degrade to the database with bounded load and visible monitoring.
+
+---
+
+## Optional Day 22 — Load test and add observability
+
+**Milestone:** MiniTrack has a measured baseline, performance budget, and enough
+telemetry to identify whether latency comes from the app, database, or cache.
+
+### Steps and substeps
+
+- [ ] **1. Define a workload**
+  - Model list/search-heavy traffic plus bounded writes and authenticated users.
+  - Run only against an isolated performance environment.
+- [ ] **2. Choose service-level indicators**
+  - Track request rate, error rate, and p50/p95/p99 latency.
+  - Track event-loop delay, CPU, memory, pool wait time, query duration, cache
+    hit rate, and database saturation.
+- [ ] **3. Add structured telemetry**
+  - Emit privacy-safe structured logs with request IDs.
+  - Add metrics and optional distributed traces across HTTP, cache, and SQL.
+  - Never attach secrets, cookies, raw task text, or unbounded user IDs.
+- [ ] **4. Increase load gradually**
+  - Establish a baseline, ramp load, hold it, and observe saturation.
+  - Stop when the agreed environment limit or error budget is reached.
+- [ ] **5. Change one variable**
+  - Compare before and after one index, pool, cache, or replica change.
+
+### Concepts to know
+
+Load versus stress testing; throughput; percentiles; saturation; SLI/SLO;
+structured logs; metrics; traces; correlation IDs; coordinated omission.
+
+### Interview questions
+
+1. **Why report p95 instead of only average latency?** — Averages hide the
+   slower experience affecting a meaningful fraction of users.
+2. **What should a load test model?** — Realistic operation mix, data shape,
+   authentication, pacing, and environment limits.
+3. **How do logs, metrics, and traces differ?** — Logs describe events, metrics
+   summarize trends, and traces connect work across components.
+
+---
+
+## Optional Day 23 — Scale app instances behind a load balancer
+
+**Milestone:** Multiple stateless Next.js instances serve traffic through a
+load balancer without losing sessions or multiplying database load blindly.
+
+### Steps and substeps
+
+- [ ] **1. Remove process-local assumptions**
+  - Keep sessions in Auth.js/PostgreSQL and shared cache data in Redis.
+  - Do not rely on in-memory task state, local files, or one instance receiving
+    every request.
+- [ ] **2. Configure health semantics**
+  - Liveness says the process should be restarted.
+  - Readiness says the instance can receive traffic.
+  - Keep dependency checks bounded so an outage does not trigger a restart storm.
+- [ ] **3. Add a load balancer**
+  - Route traffic only to ready instances.
+  - Preserve original HTTPS and host information needed by Auth.js callbacks.
+  - Avoid sticky sessions unless a documented dependency truly requires them.
+- [ ] **4. Recalculate shared capacity**
+  - Revisit PostgreSQL pools, Redis connections, provider rate limits, and
+    distributed rate limiting.
+- [ ] **5. Verify horizontal behavior**
+  - Alternate requests across instances and test sign-in, mutations, refresh,
+    graceful termination, and one-instance failure.
+
+### Concepts to know
+
+Horizontal scaling; stateless services; load-balancing algorithms; health
+probes; graceful draining; sticky sessions; shared state; distributed limits.
+
+### Interview questions
+
+1. **What makes an app instance stateless?** — Any instance can handle the next
+   request because durable/shared state is external to process memory.
+2. **Readiness versus liveness?** — Readiness controls traffic; liveness decides
+   whether the process should restart.
+3. **Why can scaling the web tier hurt the database?** — More instances create
+   more concurrency and connection pools against the same bottleneck.
+
+---
+
+## Optional Day 24 — Run MiniTrack on local Kubernetes
+
+**Milestone:** A local cluster runs the container through a Deployment, Service,
+Ingress, probes, resource limits, and a controlled migration Job.
+
+### Steps and substeps
+
+- [ ] **1. Create a local cluster**
+  - Use a learning cluster such as kind, Minikube, or Docker Desktop Kubernetes.
+  - Load the immutable MiniTrack image into the cluster.
+- [ ] **2. Define workload and networking**
+  - Create a Deployment with at least two replicas.
+  - Add a ClusterIP Service and local Ingress.
+  - Configure readiness, liveness, graceful termination, and rolling updates.
+- [ ] **3. Configure resources and settings**
+  - Add CPU/memory requests and limits based on measurement.
+  - Use ConfigMaps for non-secret settings and Secrets for sensitive values.
+  - Treat Kubernetes Secrets as encoded configuration unless encryption and
+    access controls are configured.
+- [ ] **4. Run migrations once**
+  - Use a versioned Job before the application rollout.
+  - Make migration failure block promotion.
+- [ ] **5. Keep state external**
+  - Use managed/external PostgreSQL and Redis for the realistic architecture.
+  - Run a PostgreSQL StatefulSet only as a separate storage-learning exercise.
+
+### Concepts to know
+
+Pods; Deployments; Services; Ingress; ConfigMaps; Secrets; Jobs; probes;
+requests and limits; rolling updates; declarative reconciliation.
+
+### Interview questions
+
+1. **Deployment versus Service?** — A Deployment manages pod replicas and
+   rollout; a Service provides stable discovery and traffic distribution.
+2. **Why set requests and limits?** — The scheduler needs capacity information,
+   and limits bound noisy-container resource use.
+3. **Why keep PostgreSQL external initially?** — Reliable database operation
+   requires storage, backups, failover, upgrades, and recovery beyond a simple
+   StatefulSet manifest.
+
+---
+
+## Optional Day 25 — Build delivery and resilience workflows
+
+**Milestone:** A reviewed pipeline publishes immutable images, promotes them
+through an environment, verifies rollout, and demonstrates rollback under
+controlled failures.
+
+### Steps and substeps
+
+- [ ] **1. Publish immutable artifacts**
+  - Build once after CI passes.
+  - Sign or attest the image where supported and tag it with an immutable
+    commit identifier, not only `latest`.
+- [ ] **2. Promote through environments**
+  - Deploy the same image to a staging environment.
+  - Run migrations, smoke tests, authorization tests, and performance checks.
+  - Require approval before production promotion.
+- [ ] **3. Configure rollout and rollback**
+  - Use rolling updates first; compare blue/green or canary strategies.
+  - Monitor error and latency signals and roll back automatically or manually
+    using explicit thresholds.
+- [ ] **4. Run resilience drills**
+  - Terminate an app pod, make Redis unavailable, exhaust a safe test pool, and
+    simulate a database failover in a non-production environment.
+  - Verify degradation, alerts, recovery, and data correctness.
+- [ ] **5. Review the complete architecture**
+  - Document load balancer, app replicas, Auth.js, cache, primary/replica
+    PostgreSQL, telemetry, CI/CD, backups, and trust boundaries.
+  - Record cost and complexity added by each component.
+
+### Concepts to know
+
+Continuous delivery; immutable promotion; registries; provenance; rolling,
+blue/green, and canary deployment; rollback; resilience testing; error budgets.
+
+### Interview questions
+
+1. **Why build once and promote the same image?** — Rebuilding per environment
+   can produce different artifacts, weakening test evidence.
+2. **What should trigger rollback?** — Predefined user-impact signals such as
+   error rate, latency, failed health checks, or correctness violations.
+3. **What happens when Redis fails?** — Cache-aside reads should degrade
+   carefully to PostgreSQL while monitoring protects the database from a surge.
+4. **When is Kubernetes not justified?** — When its operational cost exceeds
+   the application's scale, reliability, team, or learning requirements.
+
+---
+
+## Infrastructure learning completion checklist
+
+- [ ] A non-root multi-stage image runs without embedded secrets.
+- [ ] Docker Compose starts app, PostgreSQL, and one-shot migrations.
+- [ ] CI gates lint, tests, type checking, build, migrations, and browser tests.
+- [ ] Query plans and indexes are measured with representative data.
+- [ ] Pagination bounds result size and avoids large offsets.
+- [ ] App replica count and pool size fit the PostgreSQL connection budget.
+- [ ] Backup restore and documented recovery objectives are tested.
+- [ ] Cached private data is owner-scoped and invalidated on mutation.
+- [ ] Cache failure degrades safely without hiding errors.
+- [ ] Load tests report throughput, errors, and latency percentiles.
+- [ ] Logs, metrics, and traces are privacy-safe and correlated.
+- [ ] Multiple app instances work through a load balancer without sticky state.
+- [ ] Kubernetes uses probes, requests/limits, external state, and migration Jobs.
+- [ ] The delivery pipeline promotes immutable images and verifies rollback.
+- [ ] Each added component has a measured reason, owner, cost, and failure plan.
+
 ## Whole-app completion checklist
 
 - [ ] PostgreSQL schema exists and `DATABASE_URL` is configured locally.
@@ -938,9 +1390,10 @@ documentation as an interface; privacy-aware logging; end-to-end system tracing.
 - [ ] Local, test, and production secrets are configured separately and never committed.
 - [ ] Setup, migrations, tests, deployment, and recovery are documented.
 
-## Still optional after the complete app
+## Still optional after the infrastructure track
 
 Team workspaces, task sharing, reminders, file attachments, real-time updates,
-advanced analytics, billing, multi-factor authentication, extensive rate
-limiting, and high-availability operations can be separate future milestones.
-Add them only when there is a clear product or learning goal.
+advanced analytics, billing, multi-factor authentication, multi-region
+operation, sharding, service meshes, and event-driven microservices can be
+separate future milestones. Add them only when there is a clear product or
+learning goal.

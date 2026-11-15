@@ -166,7 +166,10 @@ and deployment. The repository's Python DSA days are a separate learning track.
 
 - No payments, reservations, drag-and-drop board, real-time chat, or mobile app.
 - No complex dashboard, custom design system, or elaborate validation flows.
-- No Redis, queues, Docker, Kubernetes, or microservices needed to reach the first working version.
+- No Redis, queues, Docker, Kubernetes, or microservices are needed to reach
+  the first working version. The optional Days 16–25 roadmap adds containers,
+  measured caching and scaling, delivery pipelines, and Kubernetes after the
+  application is already correct and deployed.
 - No unnecessary abstractions or libraries when built-in functionality teaches the concept more clearly.
 
 Advanced ideas can be **small isolated interview exercises** instead of new product features.

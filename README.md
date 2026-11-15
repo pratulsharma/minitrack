@@ -4,7 +4,10 @@ A **small task tracker** built to learn JavaScript, TypeScript, Node.js, Next.js
 React, Tailwind CSS, PostgreSQL, and high-value full-stack interview topics.
 Days 1–5 build the Week 1 MVP. Days 6–10 add editing, URL-backed search,
 automated tests, and GitHub authentication. Days 11–15 add owner authorization,
-security tests, accessibility, deployment, and release verification.
+security tests, accessibility, deployment, and release verification. The
+[optional Days 16–25 roadmap](docs/APP_BUILD_ROADMAP.md#optional-infrastructure-and-scaling-track)
+adds Docker, CI/CD, database scaling, caching, observability, load balancing,
+and Kubernetes after the application fundamentals are complete.
 
 ![Dark task list mockup](docs/assets/01-task-list-dark.svg)
 
