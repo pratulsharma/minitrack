@@ -5,8 +5,9 @@ tracker. It shows the build steps, the day to cover each step, the concepts to
 practice, and interview questions to review. Work through the checkboxes in
 order. Check a box only after you have built or verified that step yourself.
 
-**Your current position:** You said you are starting Day 1. Begin with the
-Day 1 section below; the boxes are intentionally unchecked so you can track
+The active `frontend/` workspace begins as the untouched `create-next-app`
+scaffold. Build it in lesson order; completed future code is isolated under
+`reference/frontend-complete/`. The boxes remain unchecked so you can track
 your own progress.
 
 **Important:** The repository currently has full-stack app lessons for Days
@@ -32,7 +33,7 @@ work.
 |---|---|---|
 | 1 | Understand JavaScript execution and serve `GET /tasks` | [ ] Not started |
 | 2 | Handle asynchronous request bodies and create tasks in memory | [ ] Not started |
-| 3 | Persist tasks in PostgreSQL and create `GET`/`POST` API routes | [ ] Not started |
+| 3 | Scaffold Next.js, then persist tasks and create `GET`/`POST` routes | [ ] Not started |
 | 4 | Render database tasks with a Next.js Server Component | [ ] Not started |
 | 5 | Add browser interactions and finish basic task CRUD | [ ] Not started |
 | 6 | Add title editing to the database/API | [ ] Not started |
@@ -333,40 +334,46 @@ in-memory state and process lifetime.
 
 ---
 
-## Day 3 — PostgreSQL, TypeScript, and the collection API
+## Day 3 — Create Next.js, add PostgreSQL, and build the collection API
 
 **Lesson:** [Day 3](../lessons/day-03.md)  
-**Milestone:** Store tasks in PostgreSQL and expose `GET /api/tasks` and
-`POST /api/tasks` from Next.js.
+**Milestone:** Understand the generated Next.js application, then store tasks
+in PostgreSQL and expose `GET /api/tasks` and `POST /api/tasks`.
 
 ### Steps and substeps
 
-- [ ] **1. Create the database schema**
+- [ ] **1. Create and inspect the Next.js application**
+  - Run the documented `create-next-app` command, or confirm the provided active `frontend/` is its untouched output.
+  - Start the development server and verify the default page before adding MiniTrack code.
+  - Identify the jobs of `app/page.tsx`, `app/layout.tsx`, `package.json`, and `tsconfig.json`.
+  - Replace only the starter page with the first static MiniTrack heading.
+- [ ] **2. Create the database schema**
   - Create or start a local PostgreSQL instance and create the `minitrack` database.
   - Run `backend/sql/schema.sql`.
   - Inspect the `tasks` table and explain its identity ID, constraints, default values, and timestamp.
-- [ ] **2. Configure the Next.js app**
-  - Install the frontend dependencies.
-  - Copy `frontend/.env.local.example` to `frontend/.env.local` and set `DATABASE_URL`.
+- [ ] **3. Configure the PostgreSQL driver**
+  - Install `pg` and its TypeScript definitions in the generated frontend.
+  - Create `frontend/.env.local.example`, copy it to `.env.local`, and set `DATABASE_URL`.
   - Keep credentials local; do not commit `.env.local`.
-- [ ] **3. Add the typed database and task layers**
+- [ ] **4. Add the typed database and task layers**
   - Create `frontend/lib/db.ts` with a server-only PostgreSQL connection pool.
   - Create `frontend/app/types.ts`; keep PostgreSQL `BIGINT` IDs as strings.
   - Create `frontend/lib/tasks.ts` with `listTasks` and `createTask`.
   - Use parameterized SQL and convert database timestamps to ISO strings for the app.
-- [ ] **4. Validate requests and add collection routes**
+- [ ] **5. Validate requests and add collection routes**
   - Create `frontend/lib/validation.ts` with `unknown` inputs and type guards.
   - Create `frontend/app/api/tasks/route.ts` with `GET` and `POST`.
   - Create `frontend/app/api/health/route.ts` for the health check.
   - Return validation errors to the caller; log database errors on the server and return a generic `500`.
-- [ ] **5. Verify the API and persistence**
+- [ ] **6. Verify the API and persistence**
   - Start Next.js and call the health, list, and create endpoints.
   - Verify invalid JSON and invalid titles return a client error.
   - Restart Next.js and confirm PostgreSQL still contains the task.
 
 ### Concepts to know
 
-Relational tables; primary keys; identity columns; constraints and defaults;
+`create-next-app`; App Router file conventions; npm scripts; relational tables;
+primary keys; identity columns; constraints and defaults;
 SQL `SELECT`/`INSERT`; parameterized queries; SQL injection prevention;
 connection pooling; server-only modules; TypeScript types and `unknown`;
 JSON and HTTP status codes; persistence.

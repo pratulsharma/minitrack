@@ -30,19 +30,37 @@ sequenceDiagram
   Note over Browser: Displays list (no client mutation yet)
 ```
 
-## 2. Install and start the Next.js project (15 min)
+## 2. Confirm the Day 3 starting point (10 min)
 
-From the repository root, configure the database URL if you have not already, then run Next.js:
+Do not scaffold another app today. Day 3 already created `frontend/` with
+`create-next-app`, then you added the database helpers and collection Route
+Handler one file at a time.
+
+Before continuing, confirm you created these files yourself:
+
+```text
+frontend/
+├── app/
+│   ├── api/health/route.ts
+│   ├── api/tasks/route.ts
+│   └── types.ts
+├── lib/
+│   ├── db.ts
+│   ├── tasks.ts
+│   └── validation.ts
+└── .env.local
+```
+
+If any are missing, return to Day 3 instead of copying the completed reference.
+Then start your current project:
 
 ```bash
 cd frontend
-npm install
-cp .env.local.example .env.local
-# Set DATABASE_URL in .env.local; it is server-only.
 npm run dev
 ```
 
-This package already has `frontend/package.json` and a minimal Next App Router setup. You do **not** need `create-next-app` again.
+Check `GET /api/health` and `GET /api/tasks` before changing the page. This
+proves the Day 3 server-side layer works independently of today's UI.
 
 ## 3. Review the task type (5 min)
 
@@ -63,7 +81,9 @@ export type Task = {
 
 ## 4. Create the page (25 min)
 
-Write `frontend/app/layout.tsx` (minimal styling only):
+First, attempt the layout yourself: keep the required `<html>` and `<body>`
+elements, set `lang="en"`, and render `children`. Then compare it with this
+minimal version in `frontend/app/layout.tsx`:
 
 ```tsx
 import type { ReactNode } from 'react';

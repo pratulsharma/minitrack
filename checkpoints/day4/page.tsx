@@ -25,3 +25,7 @@ export default async function Home() {
     </main>
   );
 }
+
+
+// the JS has 3 main components - call stack, task queue and microtask queue, event loop synchronizes what runs next 
+// all the syncronous calls go to call stack an druns first, then microtask que then tasks

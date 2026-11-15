@@ -1,8 +1,92 @@
-# Day 3 — PostgreSQL, SQL, parameters and connection pools
+# Day 3 — Create the Next.js app and connect PostgreSQL
 
-**Goal:** save tasks so they survive restarts. **Time:** ~90 min. **Today:** create the PostgreSQL schema and build typed Next.js Route Handlers with `pg`. **Next:** [Day 4](day-4.md).
+**Goal:** start from `create-next-app`, understand the generated files, and then save tasks so they survive restarts. **Time:** three focused sessions of about 45 minutes. **Next:** [Day 4](day-4.md).
 
-## 1. Why PostgreSQL? (10 min)
+> **Important learning rule:** The active `frontend/` directory contains only
+> the generated Next.js starter at the beginning of this lesson. Build the
+> database and API files yourself in the order below. The finished application
+> is isolated under `reference/frontend-complete/`; do not copy from it while
+> completing the lesson.
+
+## Session 3A — Create and understand the frontend
+
+### 1. Scaffold the Next.js application (15 min)
+
+**What:** `create-next-app` generates the package configuration and minimum App
+Router file structure.
+
+**Why:** Starting from the official scaffold shows which files Next.js creates
+for us and which application files we add ourselves.
+
+From the repository root, the course used:
+
+```bash
+npx create-next-app@latest frontend \
+  --typescript \
+  --eslint \
+  --app \
+  --no-src-dir \
+  --no-tailwind \
+  --use-npm \
+  --import-alias '@/*' \
+  --no-react-compiler
+```
+
+If `frontend/` already contains the default **Create Next App** screen, this
+command has already been completed for you. Do not run it again inside the
+existing directory.
+
+Start only the generated application:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open `http://localhost:3000`, confirm the starter page appears, and then stop
+the server with **Ctrl+C**.
+
+### 2. Inspect the generated files (15 min)
+
+Do not change anything yet. Find each item and explain its purpose:
+
+```text
+frontend/
+├── app/
+│   ├── globals.css       # global styles imported by the root layout
+│   ├── layout.tsx        # shared HTML shell
+│   ├── page.module.css   # styles used only by the starter page
+│   └── page.tsx          # component for the / URL
+├── public/               # files served directly by URL
+├── package.json          # dependencies and npm scripts
+└── tsconfig.json         # TypeScript configuration
+```
+
+Notice what is **not** present yet: there is no `lib/`, task type, database
+driver, or `/api/tasks` route. You will create each one below.
+
+### 3. Make the first page change (15 min)
+
+Before seeing database code, prove that you understand the route-to-file
+relationship. Replace `frontend/app/page.tsx` with:
+
+```tsx
+export default function Home() {
+  return (
+    <main>
+      <h1>MiniTrack</h1>
+      <p>Next.js setup complete. PostgreSQL comes next.</p>
+    </main>
+  );
+}
+```
+
+Run `npm run dev` again and confirm the browser updates. This is still a
+Server Component: it has no `'use client'`, event handler, or React state.
+
+## Session 3B — Add persistence
+
+### 4. Why PostgreSQL? (10 min)
 
 Day 2's array is local to one Node process and disappears after restart. PostgreSQL gives persistence, indexes, constraints, and concurrency control. We write SQL directly instead of an ORM to make database behavior interview-visible.
 
@@ -36,7 +120,7 @@ sequenceDiagram
   Next-->>Client: 201 + new task JSON
 ```
 
-## 2. Install and create a database (15 min)
+### 5. Install and create a database (20 min)
 
 **On macOS with Homebrew** (skip install if Postgres already exists):
 
@@ -79,19 +163,36 @@ If authentication fails, use `psql -h localhost -U YOUR_USER -d minitrack` and s
 
 **Why identity IDs?** PostgreSQL allocates IDs, not each Node instance; sequence values can have gaps. **Why BIGINT?** Supports more IDs, but `pg` gives BIGINT values as strings by default to avoid unsafe JavaScript integer conversion.
 
-## 3. Configure TypeScript and the database driver (15 min)
+### 6. Install the database driver and configure the connection (15 min)
 
 From repository root:
 
 ```bash
 cd frontend
-npm install
-cp .env.local.example .env.local
-# Edit DATABASE_URL to match your role/password:
-# postgresql://YOUR_MAC_USER@localhost:5432/minitrack
+npm install pg
+npm install --save-dev @types/pg
 ```
 
-Create `frontend/lib/` if it does not exist, then write `frontend/lib/db.ts`:
+`pg` is the PostgreSQL driver. `@types/pg` gives TypeScript the driver's type
+definitions.
+
+Create `frontend/.env.local.example`:
+
+```env
+DATABASE_URL=postgresql://YOUR_MAC_USER@localhost:5432/minitrack
+```
+
+Then create the ignored local copy and replace the placeholder with your
+PostgreSQL role:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Use `psql -d minitrack -c '\conninfo'` to confirm your own role and port,
+then build the matching URL. Never commit `.env.local`.
+
+Create `frontend/lib/`, then write `frontend/lib/db.ts`:
 
 ```ts
 import 'server-only';
@@ -113,7 +214,9 @@ The `server-only` import prevents this database module from being included in Cl
 
 **Why a pool?** Keeping a small number of reusable PostgreSQL connections is cheaper than making a new connection for each HTTP request. The pool also limits simultaneous database connections.
 
-## 4. Add the task type and database functions (15 min)
+## Session 3C — Build the collection API
+
+### 7. Add the task type and database functions (20 min)
 
 Create `frontend/app/types.ts`. `pg` returns `BIGINT` IDs as strings, and the API sends timestamps as ISO strings:
 
@@ -172,7 +275,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 ```
 
-## 5. Add typed Route Handlers (15 min)
+### 8. Add typed Route Handlers (20 min)
 
 The Day 1–2 checkpoint servers taught the built-in Node HTTP lifecycle. In the actual Next.js app, use **Route Handlers** instead of starting another server. Create `frontend/app/api/tasks/route.ts`; Next maps exported HTTP-method functions to `/api/tasks`:
 
@@ -219,6 +322,8 @@ export function GET(): Response {
 }
 ```
 
+### 9. Run and verify your API (15 min)
+
 Run the app from `frontend`:
 
 ```bash
@@ -231,7 +336,7 @@ curl -i -X POST http://localhost:3000/api/tasks \
 
 Stop/restart Next.js and GET again. **The task should still exist.** The API and page run in the same Next.js server; PostgreSQL is the persistent store.
 
-## 6. SQL and interview drill (25 min)
+## 10. SQL and interview drill (25 min)
 
 Try:
 
@@ -337,6 +442,8 @@ try {
 
 ## Exit checklist
 
+- [ ] I ran and understood the original `create-next-app` scaffold before changing it.
+- [ ] I can explain the purpose of `page.tsx`, `layout.tsx`, `package.json`, and `tsconfig.json`.
 - [ ] Schema created; GET reads from Postgres.
 - [ ] POST survives Next.js restart.
 - [ ] I understand $1 parameters, pooling, and BIGINT strings.

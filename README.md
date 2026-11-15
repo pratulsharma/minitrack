@@ -12,11 +12,13 @@ A **small task tracker** built to learn JavaScript, TypeScript, Node.js, Next.js
 |---|---|---|
 | 1 | JS call stack, microtasks, timers, HTTP, status codes | Node.js `GET /tasks`, in memory |
 | 2 | Promises, `async/await`, closures, HTTP request bodies | Node.js `POST /tasks`, in memory |
-| 3 | TypeScript Route Handlers, PostgreSQL, SQL, parameterized queries, connection pools | Persistent tasks with `GET` and `POST` |
+| 3 | `create-next-app`, App Router files, TypeScript Route Handlers, PostgreSQL and SQL | A frontend built from its scaffold plus persistent `GET` and `POST` |
 | 4 | Next.js Server Components, server-only PostgreSQL access | Browser renders tasks read by Next.js |
 | 5 | React client state, forms, events, derived state, PATCH/DELETE | Create, complete, delete and filter tasks in browser |
 
-**Time:** ~90 minutes per day. **Rule:** attempt each lesson's exercise before viewing reference code.
+**Time:** Use focused 45-minute sessions. Day 3 is intentionally split into
+three sessions so scaffolding, persistence, and the API are learned separately.
+**Rule:** attempt each lesson's exercise before viewing reference code.
 
 ## Start here: lessons contain all the code and diagrams
 
@@ -26,7 +28,13 @@ Each day is a **standalone, sequential tutorial**: why, exact filenames, complet
 
 For the complete build sequence, per-day progress checkboxes, concepts, interview questions, and final acceptance checklist, see the [MiniTrack app build roadmap](docs/APP_BUILD_ROADMAP.md).
 
-**Progressive path:** Days 1–2 use `checkpoints/day1` and `checkpoints/day2` as JavaScript scratch files to learn Node HTTP. From Day 3 onward the TypeScript API uses Next.js Route Handlers in `frontend/app/api`; there is one Next.js server, not a separate API server. Day 4 reads from PostgreSQL in a Server Component; Day 5 adds browser mutations through Route Handlers.
+**Progressive path:** Days 1–2 use `checkpoints/day1` and `checkpoints/day2`
+as JavaScript scratch files to learn Node HTTP. Day 3 starts with the untouched
+`create-next-app` scaffold in `frontend/`; you add every database and API file
+yourself. Day 4 builds the first database-backed page. Day 5 adds the Client
+Component and browser mutations. The completed code is isolated under
+`reference/frontend-complete/` so future code does not appear in the learner
+workspace.
 
 ## Folder map
 
@@ -42,9 +50,9 @@ minitrack-week1/
 │   ├── day4/page.tsx        # Read-only Next.js page
 │   └── day5/               # Finished server and page
 ├── backend/sql/             # PostgreSQL schema
-└── frontend/                # Next.js app, TypeScript API and UI
-    ├── app/api/             # Next.js Route Handlers
-    └── lib/                 # Typed database and task functions
+├── frontend/                # Active learner workspace: create-next-app scaffold
+└── reference/
+    └── frontend-complete/   # Finished app; compare only after attempting lessons
 ```
 
 ## Prerequisites
@@ -53,7 +61,7 @@ minitrack-week1/
 - PostgreSQL installed locally by Day 3; optional `psql` CLI
 - VS Code; one terminal for Next.js
 
-## Fast start: reference implementation (after trying lessons)
+## Run the completed reference (only after trying the lessons)
 
 1. Create a local Postgres database. On macOS with Homebrew, one option is:
 
@@ -72,10 +80,10 @@ minitrack-week1/
    psql -d minitrack -f backend/sql/schema.sql
    ```
 
-3. Configure and start Next.js (the API routes run inside this server):
+3. Configure and start the isolated completed application:
 
    ```bash
-   cd frontend
+   cd reference/frontend-complete
    cp .env.local.example .env.local
    # Edit DATABASE_URL to match your local Postgres credentials.
    npm install
@@ -90,9 +98,10 @@ minitrack-week1/
 
 If using `psql` with a different role, provide `-U USER -h localhost` and the appropriate password. Do not commit `.env` files.
 
-## Basic verification
+## Completed-reference verification
 
 ```bash
+# Run these only after starting reference/frontend-complete.
 curl -i http://localhost:3000/api/health
 curl -i http://localhost:3000/api/tasks
 curl -i -X POST http://localhost:3000/api/tasks   -H 'Content-Type: application/json'   -d '{"title":"Practice closures"}'
@@ -120,7 +129,11 @@ git push -u origin main
 
 Or if the GitHub CLI is installed and authenticated: `gh repo create minitrack --private --source=. --remote=origin --push`.
 
-**Learning workflow:** Read `lessons/day-01.md`, use `checkpoints/day1` for comparison; proceed through day 2 and day 3. The checkpoint servers intentionally use plain JavaScript to teach Node fundamentals; from Day 3 onward the app's API uses TypeScript Route Handlers. The `frontend/` app is the **finished Week 1 reference**, not code you need to understand immediately.
+**Learning workflow:** Read `lessons/day-01.md`, use `checkpoints/day1` for
+comparison, and continue in order. The checkpoint servers intentionally use
+plain JavaScript to teach Node fundamentals. On Day 3, begin in the generated
+`frontend/` scaffold and create only the files named by the current step. Do
+not use `reference/frontend-complete/` until you have attempted the lesson.
 
 See [architecture](docs/ARCHITECTURE.md), [interview index](docs/INTERVIEW_INDEX.md), and [app overview](docs/APP_OVERVIEW.md).
 

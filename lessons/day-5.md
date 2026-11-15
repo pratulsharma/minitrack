@@ -6,6 +6,11 @@
 
 Day 4 rendered data but had no interactive controls. Now we use a **Client Component** for input, event handlers, and state. Mutations go from the browser to same-origin Next.js Route Handlers; `router.refresh()` asks the Server Component to read PostgreSQL again. We keep PostgreSQL as the source of truth.
 
+At the start of today, `frontend/` should contain only the scaffold plus the
+files you created during Days 3 and 4. `TaskBoard.tsx` and the `[id]` Route
+Handler should **not** exist yet. Create them during this lesson rather than
+copying the completed reference.
+
 ### Full mutation flow
 
 ```mermaid
@@ -49,6 +54,14 @@ sequenceDiagram
 From Day 3 we already have GET/POST; today we add reusable SQL functions and route handling in TypeScript.
 
 ### Step 1: Add the database functions
+
+Before opening the complete implementation, try writing the signatures
+yourself:
+
+```ts
+export async function setDone(id: string, done: boolean): Promise<Task | null>
+export async function deleteTask(id: string): Promise<boolean>
+```
 
 Replace the contents of `frontend/lib/tasks.ts` with the full CRUD implementation below. It preserves the Day 3 `listTasks` and `createTask` functions, then adds `setDone` and `deleteTask`.
 
@@ -192,7 +205,16 @@ curl -i -X DELETE http://localhost:3000/api/tasks/TASK_ID
 
 ## 3. Write the interactive React component (30 min)
 
-Write `frontend/app/TaskBoard.tsx`:
+Build `frontend/app/TaskBoard.tsx` in small passes:
+
+1. Add `'use client'` and render the task titles from props.
+2. Add only the controlled title input.
+3. Add the submit handler and verify POST.
+4. Add completion and delete handlers.
+5. Add the filter and error/busy states last.
+
+After each pass, run the app before adding the next behavior. Then compare your
+result with the complete component:
 
 ```tsx
 'use client';
