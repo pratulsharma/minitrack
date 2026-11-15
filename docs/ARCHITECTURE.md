@@ -20,7 +20,10 @@ Browser (http://localhost:3000)
 4. **PostgreSQL with raw `pg` SQL** — learn `SELECT`, `INSERT`, `UPDATE`, `DELETE`, parameterization, and pooling before introducing an ORM.
 5. **Server Component reads initial tasks directly** — avoids making an unnecessary HTTP request from the Next.js server back to itself. `cache: 'no-store'` is not needed for this direct database query.
 6. **Client Component performs mutations through Route Handlers** — browser requests remain HTTP-visible, while server-only database credentials and SQL stay out of the client bundle.
-7. **Minimal UI** — native HTML and a little inline styling. No Tailwind, animation, UI library, or design system.
+7. **Tailwind for focused styling** — utility classes make the dark responsive
+   interface visible in the component while the lessons explain the underlying
+   layout, spacing, color, breakpoint, and interaction-state concepts. No
+   additional component library or design system is required.
 8. **Tasks are a single table** — `id` identity primary key, `title` text, `done` boolean, `created_at` timestamp. No login/users yet.
 9. **Fail safely on database errors** — API returns a generic 500 response while diagnostic details are logged on the server.
 

@@ -1,6 +1,7 @@
 import { createTask, listTasks } from '../../../lib/tasks';
 import { isRecord, normalizeTitle } from '../../../lib/validation';
 
+// Next.js maps this named export to GET /api/tasks.
 export async function GET(): Promise<Response> {
   try {
     return Response.json(await listTasks(), {
@@ -13,6 +14,7 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  // JSON from the network is untrusted, so keep it unknown until validation.
   let body: unknown;
   try {
     body = await request.json();

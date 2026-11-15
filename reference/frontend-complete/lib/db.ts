@@ -1,6 +1,7 @@
 import 'server-only';
 import { Pool } from 'pg';
 
+// Cache the pool across Next.js development reloads instead of opening new pools.
 const globalForPg = globalThis as typeof globalThis & { taskPool?: Pool };
 
 export function getPool(): Pool {
@@ -9,6 +10,7 @@ export function getPool(): Pool {
     throw new Error('DATABASE_URL is missing. Copy frontend/.env.local.example to .env.local and edit it.');
   }
 
+  // The pool reuses a bounded number of database connections across requests.
   globalForPg.taskPool ??= new Pool({ connectionString, max: 5 });
   return globalForPg.taskPool;
 }

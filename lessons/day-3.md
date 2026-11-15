@@ -1,6 +1,6 @@
 # Day 3 — Create the Next.js app and connect PostgreSQL
 
-**Goal:** start from `create-next-app`, understand the generated files, and then save tasks so they survive restarts. **Time:** three focused sessions of about 45 minutes. **Next:** [Day 4](day-4.md).
+**Goal:** start from `create-next-app`, understand the generated files and Tailwind setup, and then save tasks so they survive restarts. **Time:** three focused sessions of about 45 minutes. **Next:** [Day 4](day-4.md).
 
 > **Important learning rule:** The active `frontend/` directory contains only
 > the generated Next.js starter at the beginning of this lesson. Build the
@@ -26,7 +26,7 @@ npx create-next-app@latest frontend \
   --eslint \
   --app \
   --no-src-dir \
-  --no-tailwind \
+  --tailwind \
   --use-npm \
   --import-alias '@/*' \
   --no-react-compiler
@@ -55,15 +55,26 @@ frontend/
 ├── app/
 │   ├── globals.css       # global styles imported by the root layout
 │   ├── layout.tsx        # shared HTML shell
-│   ├── page.module.css   # styles used only by the starter page
 │   └── page.tsx          # component for the / URL
 ├── public/               # files served directly by URL
+├── postcss.config.mjs    # runs Tailwind through PostCSS
 ├── package.json          # dependencies and npm scripts
 └── tsconfig.json         # TypeScript configuration
 ```
 
 Notice what is **not** present yet: there is no `lib/`, task type, database
 driver, or `/api/tasks` route. You will create each one below.
+
+Open `frontend/app/globals.css` and find:
+
+```css
+/* Tailwind generates utilities such as bg-slate-950 and rounded-2xl. */
+@import "tailwindcss";
+```
+
+**Why Tailwind?** It provides small utility classes for layout, spacing,
+color, responsive breakpoints, and interaction states. We will still explain
+the CSS idea behind each group instead of treating the class names as magic.
 
 ### 3. Make the first page change (15 min)
 
@@ -73,9 +84,19 @@ relationship. Replace `frontend/app/page.tsx` with:
 ```tsx
 export default function Home() {
   return (
-    <main>
-      <h1>MiniTrack</h1>
-      <p>Next.js setup complete. PostgreSQL comes next.</p>
+    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6">
+      {/* Tailwind utilities style this card without a page-specific CSS file. */}
+      <section className="w-full max-w-xl rounded-2xl border border-slate-700 bg-slate-900 p-8">
+        <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">
+          MiniTrack course
+        </p>
+        <h1 className="mt-3 text-3xl font-bold text-white">
+          Next.js and Tailwind are ready.
+        </h1>
+        <p className="mt-4 text-slate-300">
+          PostgreSQL and API routes come next.
+        </p>
+      </section>
     </main>
   );
 }
@@ -83,6 +104,8 @@ export default function Home() {
 
 Run `npm run dev` again and confirm the browser updates. This is still a
 Server Component: it has no `'use client'`, event handler, or React state.
+Change one utility at a time—for example, `p-8` to `p-4`—and observe which CSS
+property changes.
 
 ## Session 3B — Add persistence
 
@@ -198,6 +221,7 @@ Create `frontend/lib/`, then write `frontend/lib/db.ts`:
 import 'server-only';
 import { Pool } from 'pg';
 
+// Cache the pool across Next.js development reloads.
 const globalForPg = globalThis as typeof globalThis & { taskPool?: Pool };
 
 export function getPool(): Pool {
@@ -205,6 +229,7 @@ export function getPool(): Pool {
   if (!connectionString) {
     throw new Error('DATABASE_URL is missing. Copy frontend/.env.local.example to .env.local and edit it.');
   }
+  // Reuse a bounded number of connections instead of reconnecting per request.
   globalForPg.taskPool ??= new Pool({ connectionString, max: 5 });
   return globalForPg.taskPool;
 }
@@ -235,6 +260,7 @@ Create `frontend/lib/tasks.ts`. Start with the two operations used today, `listT
 import type { Task } from '../app/types';
 import { getPool } from './db';
 
+// PostgreSQL returns a Date; the browser-facing Task uses an ISO string.
 type TaskRow = Omit<Task, 'created_at'> & { created_at: Date };
 
 function toTask(row: TaskRow): Task {
@@ -251,6 +277,7 @@ export async function listTasks(): Promise<Task[]> {
 export async function createTask(title: string): Promise<Task> {
   const result = await getPool().query<TaskRow>(
     'INSERT INTO tasks (title) VALUES ($1) RETURNING id, title, done, created_at',
+    // Bound values remain separate from SQL syntax.
     [title]
   );
   const row = result.rows[0];
@@ -283,6 +310,7 @@ The Day 1–2 checkpoint servers taught the built-in Node HTTP lifecycle. In the
 import { createTask, listTasks } from '../../../lib/tasks';
 import { isRecord, normalizeTitle } from '../../../lib/validation';
 
+// Next.js maps this named export to GET /api/tasks.
 export async function GET(): Promise<Response> {
   try {
     return Response.json(await listTasks(), {
@@ -295,6 +323,7 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  // Network JSON is untrusted, so keep it unknown until validation.
   let body: unknown;
   try {
     body = await request.json();
@@ -444,6 +473,7 @@ try {
 
 - [ ] I ran and understood the original `create-next-app` scaffold before changing it.
 - [ ] I can explain the purpose of `page.tsx`, `layout.tsx`, `package.json`, and `tsconfig.json`.
+- [ ] I can explain what `@import "tailwindcss"` and a few utility classes do.
 - [ ] Schema created; GET reads from Postgres.
 - [ ] POST survives Next.js restart.
 - [ ] I understand $1 parameters, pooling, and BIGINT strings.

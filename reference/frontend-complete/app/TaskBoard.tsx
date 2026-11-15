@@ -4,6 +4,20 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from './types';
 
+// Shared utility groups keep repeated controls consistent without a CSS module.
+const fieldClass =
+  'min-w-0 rounded-xl border border-slate-700 bg-slate-950/70 px-4 text-slate-100 outline-none transition placeholder:text-slate-500 hover:border-slate-600 focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20 disabled:cursor-not-allowed disabled:opacity-50';
+const rowActionClass =
+  'min-h-9 rounded-lg px-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-700/70 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400 disabled:cursor-not-allowed disabled:opacity-50';
+
+function filterButtonClass(active: boolean): string {
+  const base =
+    'min-h-10 rounded-lg border px-3 text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400';
+  return active
+    ? `${base} border-violet-400 bg-violet-400/15 text-violet-200`
+    : `${base} border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-500 hover:text-white`;
+}
+
 // Client Component: form events and React state need browser interactivity.
 export default function TaskBoard({ tasks }: { tasks: Task[] }) {
   const [title, setTitle] = useState(''); // Controlled input: React owns the value.
@@ -15,6 +29,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  // Counts and visible tasks are derived values, so they do not need more state.
   const completedCount = tasks.filter(task => task.done).length;
   const openCount = tasks.length - completedCount;
   const query = search.trim().toLocaleLowerCase();
@@ -88,10 +103,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
   }
 
   return (
-    <section className="task-panel" aria-label="Task list">
-      <form className="task-form" onSubmit={addTask}>
+    <section
+      className="rounded-2xl border border-slate-700 bg-slate-900/90 p-4 shadow-2xl shadow-black/25 sm:p-6 lg:px-8"
+      aria-label="Task list"
+    >
+      {/* Mobile stacks the controls; sm: changes them to a row on wider screens. */}
+      <form className="flex flex-col gap-3 sm:flex-row" onSubmit={addTask}>
         <input
-          className="task-input"
+          className={`${fieldClass} min-h-13 flex-1`}
           aria-label="Task title"
           value={title}
           onChange={event => setTitle(event.target.value)}
@@ -99,15 +118,19 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           maxLength={200}
           disabled={busy}
         />
-        <button className="primary-button" disabled={busy || !title.trim()} type="submit">
+        <button
+          className="min-h-13 rounded-xl bg-violet-500 px-5 font-bold text-white transition hover:bg-violet-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={busy || !title.trim()}
+          type="submit"
+        >
           {busy ? 'Saving…' : '+ Add task'}
         </button>
       </form>
 
-      <div className="task-toolbar">
-        <div className="filter-tabs" role="group" aria-label="Filter tasks">
+      <div className="my-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter tasks">
           <button
-            className={`filter-tab${filter === 'all' ? ' filter-tab-active' : ''}`}
+            className={filterButtonClass(filter === 'all')}
             aria-pressed={filter === 'all'}
             onClick={() => setFilter('all')}
             type="button"
@@ -115,7 +138,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
             All <span>{tasks.length}</span>
           </button>
           <button
-            className={`filter-tab${filter === 'open' ? ' filter-tab-active' : ''}`}
+            className={filterButtonClass(filter === 'open')}
             aria-pressed={filter === 'open'}
             onClick={() => setFilter('open')}
             type="button"
@@ -123,7 +146,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
             Open <span>{openCount}</span>
           </button>
           <button
-            className={`filter-tab${filter === 'done' ? ' filter-tab-active' : ''}`}
+            className={filterButtonClass(filter === 'done')}
             aria-pressed={filter === 'done'}
             onClick={() => setFilter('done')}
             type="button"
@@ -131,10 +154,20 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
             Completed <span>{completedCount}</span>
           </button>
         </div>
-        <label className="search-field">
-          <span className="search-icon" aria-hidden="true" />
+        <label className="flex min-h-10 w-full items-center gap-2 rounded-lg border border-slate-700 bg-slate-950/70 px-3 focus-within:border-violet-400 md:max-w-64">
+          <svg
+            className="size-4 shrink-0 text-slate-400"
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-4-4" />
+          </svg>
           <input
-            className="search-input"
+            className="min-w-0 flex-1 bg-transparent py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500"
             aria-label="Search tasks"
             type="search"
             placeholder="Search tasks..."
@@ -144,19 +177,33 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         </label>
       </div>
 
-      {error && <p className="notice notice-error" role="alert">Request failed: {error}</p>}
+      {error && (
+        <p
+          className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-200"
+          role="alert"
+        >
+          Request failed: {error}
+        </p>
+      )}
 
       {visible.length === 0 ? (
-        <div className="empty-state">
-          <strong>{tasks.length === 0 ? 'A fresh start' : 'Nothing here yet'}</strong>
-          {tasks.length === 0 ? 'Add your first task above.' : 'Try another filter or add a new task.'}
+        <div className="rounded-xl border border-dashed border-slate-700 bg-white/[0.02] px-4 py-10 text-center text-slate-400">
+          <strong className="mb-1 block text-slate-100">
+            {tasks.length === 0 ? 'A fresh start' : 'Nothing here yet'}
+          </strong>
+          {tasks.length === 0
+            ? 'Add your first task above.'
+            : 'Try another filter or add a new task.'}
         </div>
       ) : (
-        <ul className="task-list">
+        <ul className="border-t border-slate-700">
           {visible.map(task => (
-            <li className="task-row" key={task.id}>
+            <li
+              className="grid min-h-20 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-700 px-1 py-3 transition hover:bg-white/[0.02] sm:gap-4 sm:px-2"
+              key={task.id}
+            >
               <input
-                className="task-checkbox"
+                className="size-5 cursor-pointer accent-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={`Complete ${task.title}`}
                 type="checkbox"
                 checked={task.done}
@@ -170,9 +217,9 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                 }}
               />
               {editingId === task.id ? (
-                <form className="edit-form" onSubmit={saveTask}>
+                <form className="col-span-2 flex min-w-0 items-center gap-1" onSubmit={saveTask}>
                   <input
-                    className="edit-input"
+                    className={`${fieldClass} min-h-10 flex-1`}
                     aria-label={`Edit ${task.title}`}
                     value={editTitle}
                     onChange={event => setEditTitle(event.target.value)}
@@ -180,11 +227,15 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                     autoFocus
                     disabled={busy}
                   />
-                  <button className="row-action row-action-save" type="submit" disabled={busy}>
+                  <button
+                    className={`${rowActionClass} text-violet-300`}
+                    type="submit"
+                    disabled={busy}
+                  >
                     Save
                   </button>
                   <button
-                    className="row-action"
+                    className={rowActionClass}
                     type="button"
                     disabled={busy}
                     onClick={() => {
@@ -197,19 +248,23 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                   </button>
                 </form>
               ) : (
-                <div className="task-copy">
-                  <span className={`task-title${task.done ? ' task-title-done' : ''}`}>
+                <div className="grid min-w-0 flex-1 gap-0.5">
+                  <span
+                    className={`break-words text-[0.97rem] font-semibold ${
+                      task.done ? 'text-slate-400 line-through decoration-slate-500' : 'text-slate-100'
+                    }`}
+                  >
                     {task.title}
                   </span>
-                  <span className="task-meta">
+                  <span className="text-xs text-slate-400">
                     {task.done ? 'Completed' : createdLabel(task.created_at)}
                   </span>
                 </div>
               )}
               {editingId !== task.id && (
-                <div className="task-actions">
+                <div className="flex items-center">
                   <button
-                    className="row-action"
+                    className={rowActionClass}
                     disabled={busy}
                     type="button"
                     onClick={() => {
@@ -221,7 +276,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                     Edit
                   </button>
                   <button
-                    className="row-action row-action-delete"
+                    className={`${rowActionClass} hover:bg-rose-400/10 hover:text-rose-300`}
                     disabled={busy}
                     type="button"
                     onClick={() => {
@@ -237,7 +292,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         </ul>
       )}
 
-      <p className="task-summary" aria-live="polite">
+      <p className="mt-4 text-sm text-slate-400" aria-live="polite">
         {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'} · {openCount} remaining
       </p>
     </section>

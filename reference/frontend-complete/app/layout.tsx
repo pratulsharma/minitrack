@@ -9,7 +9,10 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      {/* These Tailwind utilities become the visual defaults for every route. */}
+      <body className="min-h-screen bg-[#090d16] font-sans text-slate-100 antialiased">
+        {children}
+      </body>
     </html>
   );
 }

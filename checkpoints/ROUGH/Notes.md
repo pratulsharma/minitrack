@@ -138,7 +138,8 @@ queries can use connections while the 11th request waits. If requests arrive fas
 - 
 > Senior follow-up: Retries are safest for transient failures and idempotent operations. Blindly retrying an INSERT after an uncertain network failure can create duplicates, so creation APIs may need an idempotency key or another deduplication strategy.
 
-
+- now we will start the FE with create-next-app rather than completed code 
+- here we start with deleting the existing main page.tsx code 
 
 
 

@@ -261,25 +261,96 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
     if (ok) setTitle('');
   }
 
-  return <section>
-    <form onSubmit={addTask} style={{display: 'flex', gap: 8}}>
-      <input aria-label="Task title" value={title} onChange={e => setTitle(e.target.value)} placeholder="Add a task" maxLength={200} disabled={busy} style={{padding: 8, flex: 1}} />
-      <button disabled={busy || !title.trim()} type="submit">Add</button>
-    </form>
-    <p><label>Show: <select value={filter} onChange={e => setFilter(e.target.value as 'all' | 'open' | 'done')}>
-      <option value="all">All</option><option value="open">Open</option><option value="done">Done</option>
-    </select></label></p>
-    {error && <p role="alert" style={{color: 'crimson'}}>Request failed: {error}</p>}
-    {visible.length === 0 ? <p>No tasks in this filter.</p> :
-      <ul style={{padding: 0, listStyle: 'none'}}>{visible.map(task =>
-        <li key={task.id} style={{display:'flex', alignItems:'center', gap:10, borderBottom:'1px solid #ddd', padding:'10px 0'}}>
-          <input aria-label={`Complete ${task.title}`} type="checkbox" checked={task.done} disabled={busy}
-            onChange={e => { void request(`/api/tasks/${task.id}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({done:e.target.checked})}); }} />
-          <span style={{flex:1, textDecoration: task.done ? 'line-through':'none'}}>{task.title}</span>
-          <button disabled={busy} type="button" onClick={() => { void request(`/api/tasks/${task.id}`, {method:'DELETE'}); }}>Delete</button>
-        </li>
-      )}</ul>}
-  </section>;
+  return (
+    <section className="rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-xl">
+      {/* Stack on phones; sm: changes the form to a row on wider screens. */}
+      <form className="flex flex-col gap-3 sm:flex-row" onSubmit={addTask}>
+        <input
+          className="min-h-12 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+          aria-label="Task title"
+          value={title}
+          onChange={event => setTitle(event.target.value)}
+          placeholder="Add a task"
+          maxLength={200}
+          disabled={busy}
+        />
+        <button
+          className="min-h-12 rounded-xl bg-violet-500 px-5 font-bold text-white hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={busy || !title.trim()}
+          type="submit"
+        >
+          Add task
+        </button>
+      </form>
+
+      <label className="mt-5 flex items-center gap-2 text-sm text-slate-300">
+        Show:
+        <select
+          className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+          value={filter}
+          onChange={event => setFilter(event.target.value as 'all' | 'open' | 'done')}
+        >
+          <option value="all">All</option>
+          <option value="open">Open</option>
+          <option value="done">Done</option>
+        </select>
+      </label>
+
+      {error && (
+        <p
+          className="mt-4 rounded-lg border border-rose-400/30 bg-rose-400/10 p-3 text-rose-200"
+          role="alert"
+        >
+          Request failed: {error}
+        </p>
+      )}
+
+      {visible.length === 0 ? (
+        <p className="mt-6 text-slate-400">No tasks in this filter.</p>
+      ) : (
+        <ul className="mt-6 border-t border-slate-700">
+          {visible.map(task => (
+            <li
+              className="flex items-center gap-3 border-b border-slate-700 py-4"
+              key={task.id}
+            >
+              <input
+                className="size-5 accent-violet-400"
+                aria-label={`Complete ${task.title}`}
+                type="checkbox"
+                checked={task.done}
+                disabled={busy}
+                onChange={event => {
+                  void request(`/api/tasks/${task.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ done: event.target.checked }),
+                  });
+                }}
+              />
+              <span
+                className={`flex-1 ${
+                  task.done ? 'text-slate-500 line-through' : 'text-slate-100'
+                }`}
+              >
+                {task.title}
+              </span>
+              <button
+                className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-rose-400/10 hover:text-rose-300"
+                disabled={busy}
+                type="button"
+                onClick={() => {
+                  void request(`/api/tasks/${task.id}`, { method: 'DELETE' });
+                }}
+              >
+                Delete
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 ```
 
@@ -291,6 +362,8 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 - We **derive** the visible list from `tasks` and `filter`. No extra `useEffect` or duplicate task state.
 - `busy` disables interactions while the request is in flight. This reduces duplicates but is **not** server-side idempotency.
 - `finally` clears busy even after an error; `router.refresh()` re-fetches server data.
+- Tailwind responsive prefixes such as `sm:` apply a utility only at that breakpoint and above.
+- Conditional class strings make completed and active task states visually different.
 
 Update `frontend/app/page.tsx` to read PostgreSQL in the Server Component and render the new component:
 
@@ -310,7 +383,30 @@ export default async function Home() {
   } catch (err) {
     error = err instanceof Error ? err.message : 'Unable to load tasks';
   }
-  return <main><h1>MiniTrack</h1><p>Simple tasks. Serious full-stack concepts.</p>{error ? <p role="alert">Could not load tasks: {error}. Check PostgreSQL and DATABASE_URL.</p> : <TaskBoard tasks={tasks} />}</main>;
+  return (
+    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
+      <header className="mb-8">
+        <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">
+          Your workspace
+        </p>
+        <h1 className="mt-3 text-4xl font-bold tracking-tight">MiniTrack</h1>
+        <p className="mt-2 text-slate-400">
+          Simple tasks. Serious full-stack concepts.
+        </p>
+      </header>
+
+      {error ? (
+        <p
+          className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200"
+          role="alert"
+        >
+          Could not load tasks: {error}. Check PostgreSQL and DATABASE_URL.
+        </p>
+      ) : (
+        <TaskBoard tasks={tasks} />
+      )}
+    </main>
+  );
 }
 ```
 

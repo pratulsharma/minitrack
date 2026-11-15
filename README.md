@@ -1,6 +1,8 @@
 # MiniTrack — Week 1 (Days 1–5)
 
-A **small task tracker** built to learn JavaScript, TypeScript, Node.js, Next.js, React, PostgreSQL and high-value full-stack interview topics. No authentication, CSS framework, Docker or caching in week 1.
+A **small task tracker** built to learn JavaScript, TypeScript, Node.js, Next.js,
+React, Tailwind CSS, PostgreSQL, and high-value full-stack interview topics.
+Week 1 intentionally omits authentication, Docker, and caching.
 
 ![Dark task list mockup](docs/assets/01-task-list-dark.svg)
 
@@ -12,9 +14,9 @@ A **small task tracker** built to learn JavaScript, TypeScript, Node.js, Next.js
 |---|---|---|
 | 1 | JS call stack, microtasks, timers, HTTP, status codes | Node.js `GET /tasks`, in memory |
 | 2 | Promises, `async/await`, closures, HTTP request bodies | Node.js `POST /tasks`, in memory |
-| 3 | `create-next-app`, App Router files, TypeScript Route Handlers, PostgreSQL and SQL | A frontend built from its scaffold plus persistent `GET` and `POST` |
-| 4 | Next.js Server Components, server-only PostgreSQL access | Browser renders tasks read by Next.js |
-| 5 | React client state, forms, events, derived state, PATCH/DELETE | Create, complete, delete and filter tasks in browser |
+| 3 | `create-next-app`, Tailwind basics, App Router files, Route Handlers, PostgreSQL and SQL | A styled scaffold plus persistent `GET` and `POST` |
+| 4 | Next.js Server Components, server-only PostgreSQL access, Tailwind layout utilities | Browser renders styled tasks read by Next.js |
+| 5 | React state, forms, events, derived state, responsive Tailwind, PATCH/DELETE | Create, complete, delete and filter tasks in browser |
 
 **Time:** Use focused 45-minute sessions. Day 3 is intentionally split into
 three sessions so scaffolding, persistence, and the API are learned separately.
@@ -50,7 +52,7 @@ minitrack-week1/
 │   ├── day4/page.tsx        # Read-only Next.js page
 │   └── day5/               # Finished server and page
 ├── backend/sql/             # PostgreSQL schema
-├── frontend/                # Active learner workspace: create-next-app scaffold
+├── frontend/                # Active learner workspace: Next.js + Tailwind scaffold
 └── reference/
     └── frontend-complete/   # Finished app; compare only after attempting lessons
 ```

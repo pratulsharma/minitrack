@@ -4,6 +4,7 @@ import { isRecord, isValidId, normalizeTitle } from '../../../../lib/validation'
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, { params }: RouteContext): Promise<Response> {
+  // Dynamic route parameters are asynchronous in this Next.js version.
   const { id } = await params;
   if (!isValidId(id)) {
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
@@ -22,6 +23,7 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
 
   const hasDone = Object.hasOwn(body, 'done');
   const hasTitle = Object.hasOwn(body, 'title');
+  // One operation per request keeps update validation unambiguous.
   if (hasDone === hasTitle) {
     return Response.json({ error: 'Provide either done or title' }, { status: 400 });
   }

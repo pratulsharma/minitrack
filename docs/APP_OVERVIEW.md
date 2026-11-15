@@ -123,7 +123,8 @@ The task representation and API routes may evolve as we learn; we'll document me
 
 | Technology | Why we're using it | What we'll avoid initially |
 |---|---|---|
-| **Next.js + React + TypeScript** | Learn rendering, hooks, component boundaries, SSR vs. client behavior | Complex CSS, heavy UI libraries |
+| **Next.js + React + TypeScript** | Learn rendering, hooks, component boundaries, SSR vs. client behavior | Hiding behavior behind unnecessary abstractions |
+| **Tailwind CSS** | Learn utility-first layout, spacing, responsive breakpoints, and interaction states | Adding a second component library or unexplained design system |
 | **Node.js built-in HTTP in checkpoints** | Understand the raw request/response lifecycle and streams before using a framework | Hiding fundamentals behind a framework immediately |
 | **Next.js Route Handlers** | Implement a TypeScript API in the same app as the UI | Maintaining a separate local API server for a single Next.js project |
 | **PostgreSQL + `pg`** | Learn real SQL, transactions, safe parameterized queries and pooling | Starting with an ORM |
@@ -145,7 +146,7 @@ and deployment. The repository's Python DSA days are a separate learning track.
 ## 8. What we're intentionally NOT building
 
 - No payments, reservations, drag-and-drop board, real-time chat, or mobile app.
-- No complex dashboard, intricate CSS, or elaborate validation flows.
+- No complex dashboard, custom design system, or elaborate validation flows.
 - No Redis, queues, Docker, Kubernetes, or microservices needed to reach the first working version.
 - No unnecessary abstractions or libraries when built-in functionality teaches the concept more clearly.
 

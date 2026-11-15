@@ -1,6 +1,7 @@
 import type { Task } from '../app/types';
 import { getPool } from './db';
 
+// pg returns timestamps as Date objects; the UI-facing Task uses an ISO string.
 type TaskRow = Omit<Task, 'created_at'> & { created_at: Date };
 
 function toTask(row: TaskRow): Task {
@@ -17,6 +18,7 @@ export async function listTasks(): Promise<Task[]> {
 export async function createTask(title: string): Promise<Task> {
   const result = await getPool().query<TaskRow>(
     'INSERT INTO tasks (title) VALUES ($1) RETURNING id, title, done, created_at',
+    // Bound values stay separate from SQL syntax and prevent value-based injection.
     [title]
   );
   const row = result.rows[0];
@@ -44,5 +46,6 @@ export async function setDone(id: string, done: boolean): Promise<Task | null> {
 
 export async function deleteTask(id: string): Promise<boolean> {
   const result = await getPool().query('DELETE FROM tasks WHERE id = $1 RETURNING id', [id]);
+  // rowCount distinguishes a successful deletion from an ID that did not exist.
   return result.rowCount !== null && result.rowCount > 0;
 }

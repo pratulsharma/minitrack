@@ -9,6 +9,7 @@ unchecked until that milestone has been completed and verified.
 - [ ] Day 2 `node checkpoints/day2/server.cjs` supports POST (stop before Day 3)
 - [ ] Day 3 default `create-next-app` page runs before adding MiniTrack code
 - [ ] Day 3 I can explain `app/page.tsx`, `app/layout.tsx`, `package.json`, and `tsconfig.json`
+- [ ] Day 3 I can explain the Tailwind import, utility classes, and responsive prefixes
 - [ ] Day 3 `psql -d minitrack -f backend/sql/schema.sql` succeeds
 - [ ] Day 3 Next.js Route Handlers connect to PostgreSQL after setting `frontend/.env.local`
 - [ ] Day 4 `cd frontend && npm run dev` renders PostgreSQL tasks

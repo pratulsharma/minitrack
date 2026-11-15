@@ -1,5 +1,17 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## MiniTrack course starting point
+
+This directory is the learner workspace. It intentionally begins with only the
+Next.js scaffold and a small Tailwind verification card. Database modules,
+Route Handlers, and interactive components are created gradually in
+[`../lessons/day-03.md`](../lessons/day-03.md) through
+[`../lessons/day-05.md`](../lessons/day-05.md).
+
+Tailwind v4 is initialized by `postcss.config.mjs` and
+`app/globals.css`. Comments in the starter code explain the connection between
+Next.js fonts, Tailwind utilities, and the shared root layout.
+
 ## Getting Started
 
 First, run the development server:

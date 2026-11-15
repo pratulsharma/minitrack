@@ -337,8 +337,8 @@ in-memory state and process lifetime.
 ## Day 3 — Create Next.js, add PostgreSQL, and build the collection API
 
 **Lesson:** [Day 3](../lessons/day-03.md)  
-**Milestone:** Understand the generated Next.js application, then store tasks
-in PostgreSQL and expose `GET /api/tasks` and `POST /api/tasks`.
+**Milestone:** Understand the generated Next.js and Tailwind setup, then store
+tasks in PostgreSQL and expose `GET /api/tasks` and `POST /api/tasks`.
 
 ### Steps and substeps
 
@@ -346,7 +346,8 @@ in PostgreSQL and expose `GET /api/tasks` and `POST /api/tasks`.
   - Run the documented `create-next-app` command, or confirm the provided active `frontend/` is its untouched output.
   - Start the development server and verify the default page before adding MiniTrack code.
   - Identify the jobs of `app/page.tsx`, `app/layout.tsx`, `package.json`, and `tsconfig.json`.
-  - Replace only the starter page with the first static MiniTrack heading.
+  - Explain how `@import "tailwindcss"` and `postcss.config.mjs` generate utilities.
+  - Replace only the starter page with the first Tailwind-styled MiniTrack card.
 - [ ] **2. Create the database schema**
   - Create or start a local PostgreSQL instance and create the `minitrack` database.
   - Run `backend/sql/schema.sql`.
@@ -372,7 +373,8 @@ in PostgreSQL and expose `GET /api/tasks` and `POST /api/tasks`.
 
 ### Concepts to know
 
-`create-next-app`; App Router file conventions; npm scripts; relational tables;
+`create-next-app`; App Router file conventions; npm scripts; Tailwind utilities;
+PostCSS; responsive prefixes; relational tables;
 primary keys; identity columns; constraints and defaults;
 SQL `SELECT`/`INSERT`; parameterized queries; SQL injection prevention;
 connection pooling; server-only modules; TypeScript types and `unknown`;
@@ -409,6 +411,7 @@ PostgreSQL.
   - Implement `frontend/app/page.tsx` as an async Server Component.
   - Call `listTasks()` directly on the server instead of making an HTTP request to the app's own API.
   - Render loading errors clearly and show each task with a stable React key.
+  - Use Tailwind spacing, width, color, border, and state utilities; explain their CSS meaning.
 - [ ] **3. Run and verify the read path**
   - Start the app and open `http://localhost:3000`.
   - Add a task through `POST /api/tasks`, reload, and confirm it appears.
@@ -418,7 +421,7 @@ PostgreSQL.
 
 Next.js App Router; Server Components; server-side data access; async rendering;
 server-only database code; React rendering; stable list keys; error handling;
-avoiding an unnecessary internal HTTP hop.
+avoiding an unnecessary internal HTTP hop; Tailwind layout and state utilities.
 
 ### Interview questions
 
@@ -457,6 +460,7 @@ avoiding an unnecessary internal HTTP hop.
   - Add checkbox and delete handlers that call the same-origin API.
   - Derive the visible tasks from the selected filter instead of storing duplicate list state.
   - Show busy and error states while requests are in progress or fail.
+  - Use responsive Tailwind prefixes and conditional utilities for task states.
 - [ ] **4. Connect server and client rendering**
   - Update `frontend/app/page.tsx` to load tasks on the server and pass them to `TaskBoard`.
   - Call `router.refresh()` after a successful mutation so the server-rendered task data is re-read.
@@ -473,7 +477,8 @@ avoiding an unnecessary internal HTTP hop.
 Client Components; controlled inputs; React state; event handlers;
 derived state; `fetch`; `PATCH` versus `DELETE`; dynamic route params;
 validation and not-found responses; server/client component boundaries;
-`router.refresh()`; source of truth; loading and error states; testing.
+`router.refresh()`; source of truth; loading and error states; responsive
+Tailwind utilities; conditional classes; testing.
 
 ### Interview questions
 

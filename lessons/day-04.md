@@ -87,8 +87,17 @@ minimal version in `frontend/app/layout.tsx`:
 
 ```tsx
 import type { ReactNode } from 'react';
+import './globals.css';
+
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return <html lang="en"><body style={{fontFamily: 'system-ui, sans-serif', maxWidth: 740, margin: '48px auto', padding: '0 16px'}}>{children}</body></html>;
+  return (
+    <html lang="en">
+      {/* These Tailwind utilities provide defaults shared by every page. */}
+      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+        {children}
+      </body>
+    </html>
+  );
 }
 ```
 
@@ -112,18 +121,44 @@ export default async function Home() {
   }
 
   return (
-    <main>
-      <h1>MiniTrack</h1>
-      <p>{tasks.length} tasks</p>
-      {error ? <p role="alert">Could not load tasks: {error}</p> :
-        <ul>{tasks.map(task => (
-          // Stable keys let React preserve item identity between renders.
-          <li key={task.id}>{task.done ? '✅' : '⬜'} {task.title}</li>
-        ))}</ul>}
+    <main className="mx-auto min-h-screen w-full max-w-3xl px-5 py-12">
+      <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">
+        Your workspace
+      </p>
+      <h1 className="mt-3 text-4xl font-bold tracking-tight">MiniTrack</h1>
+      <p className="mt-2 text-slate-400">{tasks.length} tasks</p>
+
+      {error ? (
+        <p
+          className="mt-8 rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200"
+          role="alert"
+        >
+          Could not load tasks: {error}
+        </p>
+      ) : (
+        <ul className="mt-8 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
+          {tasks.map(task => (
+            // Stable keys let React preserve item identity between renders.
+            <li
+              className="flex items-center gap-3 border-b border-slate-700 px-5 py-4 last:border-b-0"
+              key={task.id}
+            >
+              <span aria-hidden="true">{task.done ? '✅' : '⬜'}</span>
+              <span className={task.done ? 'text-slate-500 line-through' : ''}>
+                {task.title}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   );
 }
 ```
+
+Tailwind classes are still CSS concepts: `max-w-3xl` constrains width,
+`mx-auto` centers the page, `px-5 py-12` adds spacing, and `last:border-b-0`
+removes the final divider. Change one utility and inspect the result.
 
 
 Open `http://localhost:3000`. Expected: a `MiniTrack` heading, task count, and task list; the Server Component reads from PostgreSQL through the typed `pg` helper.
