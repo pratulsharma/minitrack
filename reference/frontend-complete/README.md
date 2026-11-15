@@ -2,7 +2,8 @@
 
 This directory contains the finished Day 5 Week 1 application for comparison
 after you attempt the first five lessons. It intentionally does not include
-the Day 6–10 editing, search, test, or authentication additions.
+the Day 6–15 editing, search, testing, authentication, authorization,
+accessibility, or deployment additions.
 
 Do not copy files from here into the active `frontend/` workspace before
 writing your own version. The active workspace begins with the output from

@@ -1,4 +1,4 @@
-# MiniTrack Days 1–10 interview concept index
+# MiniTrack Days 1–15 interview concept index
 
 | Concept | Where to study | Question to explain aloud |
 |---|---|---|
@@ -24,12 +24,20 @@
 | Test pyramid / isolation | `lessons/day-09.md` | Which behavior belongs at each test level? |
 | Authentication / authorization | `lessons/day-10.md` | Why does a valid session not prove row access? |
 | Server-side access control | `lessons/day-10.md` | Why is hiding a button not protection? |
+| Ownership-scoped SQL / IDOR | `lessons/day-11.md` | Why include owner ID in every task predicate? |
+| Schema migration safety | `lessons/day-11.md` | How do you add a required owner to existing rows? |
+| Authorization test matrix | `lessons/day-12.md` | Why test both the response and unchanged data? |
+| Semantic HTML / focus | `lessons/day-13.md` | Why prefer native controls and deliberate focus? |
+| Responsive accessibility | `lessons/day-13.md` | What must remain usable beyond visual resizing? |
+| Deployment configuration | `lessons/day-14.md` | What differs between build-time and runtime config? |
+| Migration rollback | `lessons/day-14.md`, `lessons/day-15.md` | Why is app rollback different from schema recovery? |
+| End-to-end system trace | `lessons/day-15.md` | Can I explain one PATCH from browser to PostgreSQL and back? |
 
 **Review method:** look at the question, say your answer aloud, then open referenced code. Note what you got wrong in `docs/MY_NOTES.md`.
 
 ## Where the executable explanations live
 
 Each [day lesson](../lessons/day-01.md), including the
-[Days 6–10 continuation](../lessons/day-06.md), has flow and timing diagrams,
+[Days 6–15 continuation](../lessons/day-06.md), has flow and timing diagrams,
 commented source, and scenario-based Q&A. Review the diagrams first, predict
 the behavior, and then open the source file.

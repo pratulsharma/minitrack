@@ -1,86 +1,243 @@
-# Day 15 — Merge Two Sorted Lists
+# Day 15 — Verify, document, and launch MiniTrack
 
-**Pattern:** Dummy node · **Time:** 35 minutes · **Track:** Python interview DSA
+**Time:** three focused 45-minute sessions
 
-[Course home](../README.md) · [Practice file](../practice/day-15.py) · [Commented reference](../solutions/day-15.py)
+**Starting point:** Day 14 deployed the application and production smoke tests
+work.
 
-## What and why (5 minutes)
+**Goal:** Finish a reproducible release, document operations, and explain the
+entire system confidently.
 
-**Problem:** Merge two sorted linked lists into one sorted chain.
+[Previous: Day 14](day-14.md) ·
+[Roadmap](../docs/APP_BUILD_ROADMAP.md)
 
-**Why this pattern:** Dummy head reduces pointer edge cases.
+## Learning objectives
 
-**Interview trap:** Reuse nodes safely; preserve access to the next pointer.
+- run one repeatable release checklist;
+- verify critical flows and cross-user isolation;
+- document setup, migration, deployment, and recovery;
+- review privacy-safe operational behavior;
+- explain the complete request path in an interview.
 
-## Algorithm flow
+## 1. Run the release gate from a clean checkout
+
+```bash
+npm ci
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+npx tsc --noEmit
+npm run build
+git status --short
+```
+
+Expected:
+
+- every check passes;
+- no secret or generated local file is staged;
+- installation follows the lockfile;
+- another developer does not need undocumented machine state.
 
 ```mermaid
 flowchart TD
-    A[Read input and constraints] --> B[Choose Dummy node invariant]
-    B --> C[Process one element or state]
-    C --> D{Done?}
-    D -- No --> C
-    D -- Yes --> E[Return result and analyze complexity]
+  A["1. Clean checkout"] --> B["2. Install from lockfile"]
+  B --> C["3. Unit + integration + E2E"]
+  C --> D["4. Type check + production build"]
+  D --> E["5. Review diff and secrets"]
+  E --> F["6. Production journey"]
+  F --> G["7. Documentation rehearsal"]
+  G --> H{"Every gate passes?"}
+  H -- No --> I["Fix or document blocker"]
+  H -- Yes --> J["Launch"]
 ```
 
-## Execution / timing diagram
+## 2. Walk the deployed acceptance journey
+
+As User A:
+
+1. Sign in.
+2. Create a task.
+3. Rename and complete it.
+4. Search and filter through a shareable URL.
+5. Reload and confirm persistence.
+
+As User B:
+
+1. Sign in separately.
+2. Confirm User A's tasks are absent.
+3. Attempt User A's known task ID and confirm no data leaks.
+
+Finally, sign out and confirm private page and API access are blocked.
+
+## 3. Document the operating interface
+
+The main README should contain:
+
+- supported Node.js and PostgreSQL versions;
+- local database and migration commands;
+- environment variable **names**, never values;
+- development and test commands;
+- GitHub OAuth callback format;
+- deployment and smoke-test steps;
+- known limitations.
+
+Add an API summary:
+
+| Route | Authentication | Authorization |
+|---|---|---|
+| `GET /api/health` | Public | No task data |
+| `GET /api/tasks` | Required | Owner-scoped list |
+| `POST /api/tasks` | Required | Owner from session |
+| `PATCH /api/tasks/:id` | Required | ID and owner predicate |
+| `DELETE /api/tasks/:id` | Required | ID and owner predicate |
+
+## 4. Document recovery
+
+Record:
+
+- database backup and restore expectations;
+- how to roll back the application revision;
+- how migrations are applied and recovered;
+- who can access production secrets and logs;
+- which logs and metrics identify failed requests;
+- what user-visible limitations remain.
+
+Avoid success-shaped fallbacks. If PostgreSQL is unavailable, return a clear
+error and log a request identifier without task contents or secrets.
+
+## 5. Rehearse the full request path
 
 ```mermaid
 sequenceDiagram
-    participant I as Interviewer
-    participant Y as You
-    participant P as Python
-    I->>Y: State problem and constraints
-    Y->>I: Explain brute force then Dummy node
-    Y->>P: Run dry trace on small input
-    P-->>Y: Track state after each step
-    Y->>I: Complexity and edge cases
+  participant U as User
+  participant B as Browser/React
+  participant N as Next.js
+  participant A as Auth.js
+  participant P as PostgreSQL
+  U->>B: Submit task edit
+  B->>N: PATCH /api/tasks/:id
+  N->>A: auth()
+  A-->>N: Verified user ID
+  N->>N: Validate ID and body
+  N->>P: UPDATE WHERE id=$1 AND owner_id=$2
+  P-->>N: Updated row or none
+  N-->>B: JSON status/result
+  B->>N: router.refresh()
+  N->>P: Owner-scoped SELECT
+  P-->>N: Fresh task rows
+  N-->>B: Updated Server Component result
+  B-->>U: Persisted UI
 ```
 
-## Try it yourself (15 minutes)
+Explain the responsibility of each boundary:
 
-1. Open `practice/day-15.py`. Write `solve(...)` without looking below.
-2. Verbally state the invariant and walk through a sample input.
-3. Run `python -m unittest discover -s tests -v` from the repository root (reference tests run against completed solutions).
-4. Check your practice implementation with `python scripts/check_practice.py 15` when you finish.
+- browser: interaction and temporary UI state;
+- Route Handler: HTTP validation and status mapping;
+- Auth.js: verified identity and session;
+- data layer: parameterized, owner-scoped SQL;
+- PostgreSQL: constraints, persistence, and transactions;
+- tests: regression and isolation evidence;
+- deployment: configuration, observability, and recovery.
 
-### Sample cases
+## 6. Capture known limitations
 
-Build your own small linked-list/tree nodes and test empty, one-node, and multi-node cases.
+Possible honest limitations:
 
-## Commented solution — reveal after attempting
+- no task sharing or teams;
+- no pagination for very large lists;
+- no optimistic concurrency/version column;
+- limited rate limiting and abuse protection;
+- basic operational monitoring;
+- one OAuth provider.
 
-<details>
-<summary>Show Python reference implementation</summary>
+Known limitations are not failures when they are explicit and appropriate for
+the product stage.
 
-```python
-class ListNode:
-    def __init__(self, val=0, next=None):
-        self.val = val
-        self.next = next
+## Debugging exercise
 
-def solve(a, b):
-    dummy = tail = ListNode()
-    while a and b:
-        if a.val <= b.val:
-            tail.next, a = a, a.next
-        else:
-            tail.next, b = b, b.next
-        tail = tail.next
-    tail.next = a if a else b
-    return dummy.next
-```
+1. Follow setup instructions from a fresh clone and record every hidden step.
+2. Break one environment variable and judge whether the error is actionable.
+3. Simulate PostgreSQL unavailability and inspect the public response and logs.
+4. Rehearse a failed migration response without running destructive SQL.
 
-</details>
+## Tricky interview questions and answers (20 min)
 
-## Complexity (5 minutes)
+### Q1. How would you debug a production-only failure?
 
-**O(n+m) time, O(1) extra space.** Explain *why*, including auxiliary data structure cost.
+**Interview-ready answer:** Compare configuration and runtime differences,
+inspect privacy-safe logs and request IDs, reproduce with a production-like
+data shape, and narrow the failure boundary before changing code.
 
-## Tricky interview follow-up (10 minutes)
+**Example:** If OAuth works locally but not in production, compare the callback
+origin, HTTPS, secrets, and cookie behavior.
 
-**Question:** Why does a dummy node make edge cases simpler?
+**Senior follow-up:** Avoid logging secrets or copying production personal data
+into development while investigating.
 
-Before moving on, explain (1) why your implementation is correct, (2) one edge case, (3) a trade-off versus a simpler solution.
+### Q2. What is the recovery plan for a bad migration?
 
-**Next:** [Day 16](day-16.md)
+**Interview-ready answer:** Stop further rollout, preserve evidence, restore or
+roll forward using the reviewed recovery plan, and verify data integrity before
+reopening traffic.
+
+**Example:** Use a provider restore point if a migration corrupted data; do not
+improvise an unreviewed reverse query.
+
+**Senior follow-up:** Prefer backward-compatible migrations and rehearse restore
+procedures before an incident.
+
+### Q3. How do you explain MiniTrack end to end?
+
+**Interview-ready answer:** The browser sends same-origin requests to Next.js.
+Route Handlers authenticate with Auth.js, validate untrusted input, and call a
+typed data layer. Parameterized SQL includes the owner predicate, PostgreSQL
+persists the change, and React refreshes server-rendered data.
+
+**Example:** Trace one `PATCH` through the sequence diagram above.
+
+**Senior follow-up:** Mention failure behavior, test evidence, deployment
+configuration, and trade-offs—not only the happy path.
+
+### Q4. What makes documentation part of the system interface?
+
+**Interview-ready answer:** Setup, migration, testing, deployment, and recovery
+instructions determine whether another engineer can operate the software
+correctly. Undocumented requirements are hidden dependencies.
+
+**Example:** A missing OAuth callback instruction can make correct code
+undeployable.
+
+**Senior follow-up:** Validate documentation from a clean environment and keep
+it versioned with the behavior it describes.
+
+### Q5. When is the project complete?
+
+**Interview-ready answer:** It is complete for the agreed scope when critical
+user journeys, authorization boundaries, tests, accessibility checks,
+deployment, documentation, and recovery expectations all meet acceptance
+criteria.
+
+**Example:** “It runs on my laptop” is not enough if another user can read
+someone else's tasks or deployment cannot be recovered.
+
+**Senior follow-up:** Completion is scope-specific; optional features should
+not delay a reliable release without a clear product requirement.
+
+## Complexity
+
+Release verification is dominated by external systems and test duration rather
+than algorithmic complexity. A checklist reduces omission risk; automation
+reduces variance; human review remains important for security and recovery.
+
+## Exit checklist
+
+- [ ] Clean-install tests, type checking, and build pass.
+- [ ] Production sign-in and owner-scoped CRUD pass.
+- [ ] A second user cannot access the first user's tasks.
+- [ ] Keyboard and narrow-screen flows pass.
+- [ ] Setup, migrations, environment names, tests, and deployment are documented.
+- [ ] Backup, rollback, and migration recovery expectations are documented.
+- [ ] No secrets or personal data appear in source, logs, or test artifacts.
+- [ ] I can explain the system without reading the lesson.
+
+**Suggested commit:** `day15: complete MiniTrack release verification`

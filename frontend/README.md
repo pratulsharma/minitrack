@@ -8,8 +8,9 @@ Route Handlers, and interactive components are created gradually in
 [`../lessons/day-03.md`](../lessons/day-03.md) through
 [`../lessons/day-05.md`](../lessons/day-05.md). Continue with
 [`../lessons/day-06.md`](../lessons/day-06.md) through
-[`../lessons/day-10.md`](../lessons/day-10.md) for editing, URL-backed
-search, isolated tests, and GitHub sign-in.
+[`../lessons/day-15.md`](../lessons/day-15.md) for editing, URL-backed search,
+isolated tests, GitHub sign-in, owner authorization, accessibility, deployment,
+and release verification.
 
 Tailwind v4 is initialized by `postcss.config.mjs` and
 `app/globals.css`. Comments in the starter code explain the connection between

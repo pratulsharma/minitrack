@@ -1,7 +1,7 @@
-# MiniTrack architecture through Day 10
+# MiniTrack architecture through Day 15
 
 The architecture evolves by lesson. The isolated completed reference represents
-the Day 5 MVP; Days 6–10 teach the additions shown below.
+the Day 5 MVP; Days 6–15 teach the additions shown below.
 
 ```text
 Browser (http://localhost:3000)
@@ -41,9 +41,16 @@ Browser (http://localhost:3000)
 11. **Auth.js handles identity** — Day 10 uses GitHub OAuth and checks
     `auth()` in private Server Components and every task Route Handler. Secrets
     remain server-only.
-12. **Authentication precedes ownership** — through Day 10, tasks still use one
-    table with `id`, `title`, `done`, and `created_at`. App Day 11 adds owner
-    identifiers and owner-scoped SQL.
+12. **Ownership is enforced in SQL** — Day 11 adds Auth.js database users and
+    `tasks.owner_id`; every operation derives the owner from the session and
+    includes it in the query predicate.
+13. **Security needs negative tests** — Day 12 proves anonymous and cross-user
+    operations fail without changing another user's data.
+14. **Accessibility is functional behavior** — Day 13 verifies semantics,
+    keyboard/focus behavior, status announcements, zoom, and responsive layout.
+15. **Deployment includes recovery** — Days 14–15 separate environment
+    credentials, apply migrations deliberately, smoke-test production, and
+    document app rollback and database recovery.
 
 ## Data flow: adding a task
 
@@ -72,9 +79,8 @@ Browser (http://localhost:3000)
 
 ## Current trade-offs and next extensions
 
-- **No per-user authorization through Day 10** — authentication exists, but
-  all signed-in users still share tasks until owner-scoped queries arrive on
-  Day 11.
+- **No task sharing or teams** — every task has one owner; collaboration is a
+  separate product and authorization model.
 - **No optimistic UI** — first learn correct server-as-source-of-truth refresh; optimize later.
 - **No separate API framework** — Fastify/Express can be compared when the app needs an independent API service.
 - **No advanced validation** — simple checks only; add schema libraries when useful.

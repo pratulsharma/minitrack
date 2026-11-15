@@ -1,4 +1,4 @@
-# MiniTrack Days 1–10 acceptance checklist
+# MiniTrack Days 1–15 acceptance checklist
 
 Use the [app build roadmap](docs/APP_BUILD_ROADMAP.md) for the detailed
 step-by-step sequence, day-by-day progress tracking, concepts, and interview
@@ -21,6 +21,11 @@ unchecked until that milestone has been completed and verified.
 - [ ] Day 9 unit, isolated integration, and browser tests pass
 - [ ] Day 10 GitHub sign-in/sign-out works and anonymous task API calls return `401`
 - [ ] Day 10 I can explain why task ownership still waits for Day 11
+- [ ] Day 11 every task query and mutation is scoped by the session owner
+- [ ] Day 12 automated tests prove anonymous and cross-user access is blocked
+- [ ] Day 13 keyboard, accessible-name, focus, zoom, and narrow-screen checks pass
+- [ ] Day 14 production HTTPS, OAuth callback, PostgreSQL, and smoke tests work
+- [ ] Day 15 release checks, documentation, recovery plan, and system explanation are complete
 - [ ] `.env` and `.env.local` are NOT committed
 - [ ] Auth and database test secrets are NOT committed
 - [ ] I used `reference/frontend-complete/` only after attempting the lesson
@@ -29,7 +34,7 @@ unchecked until that milestone has been completed and verified.
 ## Known limits
 
 This is a teaching repo. The starting app lacks production-grade request
-limits, task ownership, and deployment hardening. Days 9–10 add test and
-authentication infrastructure; Day 11 adds per-user authorization. The UI
-and API both run on port 3000; PostgreSQL connection settings live in
-`frontend/.env.local`.
+limits and production hardening beyond the documented course scope. Days
+11–15 add owner authorization, security tests, accessibility, deployment, and
+release checks. The local UI and API both run on port 3000; PostgreSQL
+connection settings live in `frontend/.env.local`.

@@ -1,16 +1,16 @@
-# MiniTrack — Full-Stack Course (Days 1–10)
+# MiniTrack — Full-Stack Course (Days 1–15)
 
 A **small task tracker** built to learn JavaScript, TypeScript, Node.js, Next.js,
 React, Tailwind CSS, PostgreSQL, and high-value full-stack interview topics.
 Days 1–5 build the Week 1 MVP. Days 6–10 add editing, URL-backed search,
-automated tests, and GitHub authentication. Docker and application caching stay
-outside this stage.
+automated tests, and GitHub authentication. Days 11–15 add owner authorization,
+security tests, accessibility, deployment, and release verification.
 
 ![Dark task list mockup](docs/assets/01-task-list-dark.svg)
 
 > The mockups are visual references for the dark app theme. The reference app includes add, edit, complete, search, filter, and delete controls, while lessons introduce features step by step.
 
-## What you build in App Days 1–10
+## What you build in Days 1–15
 
 | Day | What you learn | What you ship |
 |---|---|---|
@@ -24,6 +24,11 @@ outside this stage.
 | 8 | URL state, `searchParams`, safe `ILIKE`, server-side filtering | Shareable task search and status filters |
 | 9 | Unit, PostgreSQL integration, and Playwright browser tests | Repeatable tests against an isolated database |
 | 10 | Auth.js, GitHub OAuth, sessions, server-side access checks | Sign in/out and reject anonymous task requests |
+| 11 | Auth.js PostgreSQL adapter, schema migrations, owner-scoped SQL | Users can access only their own tasks |
+| 12 | Authorization matrices, negative tests, identity test seams | Automated proof of user-data isolation |
+| 13 | Semantic HTML, keyboard/focus behavior, responsive verification | Accessible mobile and desktop task flow |
+| 14 | Managed services, production secrets, migrations, smoke tests | Deployed HTTPS application |
+| 15 | Release gates, recovery, documentation, system explanation | Verified and documented launch |
 
 **Time:** Use focused 45-minute sessions. Several app days are split into three
 sessions so each server, browser, and verification step can be learned
@@ -37,7 +42,9 @@ separately.
 [Day 4](lessons/day-04.md) → [Day 5](lessons/day-05.md) →
 [Day 6](lessons/day-06.md) → [Day 7](lessons/day-07.md) →
 [Day 8](lessons/day-08.md) → [Day 9](lessons/day-09.md) →
-[Day 10](lessons/day-10.md).
+[Day 10](lessons/day-10.md) → [Day 11](lessons/day-11.md) →
+[Day 12](lessons/day-12.md) → [Day 13](lessons/day-13.md) →
+[Day 14](lessons/day-14.md) → [Day 15](lessons/day-15.md).
 
 Each day is a **standalone, sequential tutorial**: why, exact filenames, complete commented code, terminal commands, expected output, flowchart, timing/sequence diagram, debugging challenges and interview Q&A. Mermaid diagrams render directly in GitHub Markdown. You do **not** need to browse checkpoint folders to understand the implementation.
 
@@ -49,8 +56,8 @@ as JavaScript scratch files to learn Node HTTP. Day 3 starts with the untouched
 yourself. Day 4 builds the first database-backed page. Day 5 adds the Client
 Component and browser mutations. The completed code is isolated under
 `reference/frontend-complete/` so future code does not appear in the learner
-workspace. Days 6–10 continue with editing, URL-backed search, automated
-testing, and GitHub authentication.
+workspace. Days 6–15 continue through editing, URL-backed search, automated
+testing, authentication, authorization, accessibility, deployment, and release.
 
 ## Folder map
 
@@ -164,6 +171,6 @@ The Python DSA lessons live in [`dsa-python/`](dsa-python/DSA_README.md).
 They are named `dsa-day-01.md` through `dsa-day-45.md` to avoid overwriting
 the full-stack lessons in [`lessons/`](lessons/day-01.md).
 
-Use full-stack `lessons/day-01.md` through `day-10.md` in sequence. Parallel
+Use full-stack `lessons/day-01.md` through `day-15.md` in sequence. Parallel
 Python practice starts with `dsa-python/lessons/dsa-day-01.md`; its filenames
 use the `dsa-day-XX.md` prefix to avoid colliding with the app course.

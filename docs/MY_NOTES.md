@@ -105,3 +105,43 @@ What if Postgres goes down? Query rejects, handler catches it and returns a serv
 - How:
 - Code:
 - Trick:
+
+## Day 11 — Task ownership and authorization
+
+- What:
+- Why:
+- How:
+- Code:
+- Trick:
+
+## Day 12 — Authentication and isolation tests
+
+- What:
+- Why:
+- How:
+- Code:
+- Trick:
+
+## Day 13 — Accessibility and responsive design
+
+- What:
+- Why:
+- How:
+- Code:
+- Trick:
+
+## Day 14 — Production deployment
+
+- What:
+- Why:
+- How:
+- Code:
+- Trick:
+
+## Day 15 — Release verification and launch
+
+- What:
+- Why:
+- How:
+- Code:
+- Trick:

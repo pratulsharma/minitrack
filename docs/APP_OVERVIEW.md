@@ -3,8 +3,8 @@
 > **Project:** MiniTrack · **Stack:** Next.js + React + TypeScript, PostgreSQL
 > **Purpose:** Learn full-stack engineering by building a tiny, useful application and practicing interview questions against real code.  
 > **Status:** The dark mockups below are design references. The isolated
-> reference app represents Day 5; Days 6–10 document editing, search,
-> testing, and sign-in additions for the learner workspace.
+> reference app represents Day 5; Days 6–15 document editing, search, testing,
+> sign-in, owner authorization, accessibility, deployment, and launch.
 
 ## 1. What are we building?
 
@@ -138,7 +138,7 @@ The task representation and API routes may evolve as we learn; we'll document me
 | **PostgreSQL + `pg`** | Learn real SQL, transactions, safe parameterized queries and pooling | Starting with an ORM |
 | **Same-origin UI and API** | Keep browser HTTP requests visible without local CORS configuration | Microservices and containers as prerequisites |
 
-## 7. Days 1–10
+## 7. Days 1–15
 
 | Day | Build outcome | Core ideas | Interview question examples |
 |---|---|---|---|
@@ -152,6 +152,11 @@ The task representation and API routes may evolve as we learn; we'll document me
 | **8** | URL search and status filters query PostgreSQL | `searchParams`, `ILIKE`, wildcard escaping | Why does parameter binding not escape `%` and `_`? |
 | **9** | Unit, integration, and E2E tests run in isolation | Test pyramid, fixtures, deterministic setup | Why must tests use a separate database? |
 | **10** | GitHub sign-in protects task entry points | OAuth, sessions, server-side checks | Why is authentication not authorization? |
+| **11** | Tasks belong to Auth.js users | Foreign keys, migrations, owner-scoped SQL, IDOR prevention | Why must owner identity come from the session? |
+| **12** | Tests prove user-data isolation | Negative security tests, fixtures, test seams | Why assert unchanged data after forbidden access? |
+| **13** | Full flow works across input modes and widths | Semantics, focus, status announcements, responsive design | Can automated accessibility tools prove usability? |
+| **14** | App runs with production services | Secrets, migrations, HTTPS, callbacks, smoke tests | Why separate app and database rollback? |
+| **15** | Release is reproducible and documented | Recovery, health, privacy-safe logs, system tracing | How do you explain the app end to end? |
 
 Days 1–5 are the Week 1 MVP track. The complete app roadmap continues through
 Day 15 with editing, search, testing, sign-in, user-data isolation, accessibility,

@@ -10,10 +10,9 @@ scaffold. Build it in lesson order; completed future code is isolated under
 `reference/frontend-complete/`. The boxes remain unchecked so you can track
 your own progress.
 
-**Important:** The repository currently has full-stack app lessons for Days
-1–10. Days 11–15 below are the planned continuation. The canonical Python DSA
-track uses `dsa-python/lessons/dsa-day-XX.md` filenames so it does not collide
-with the app sequence.
+**Important:** The repository has full-stack app lessons for Days 1–15. The
+canonical Python DSA track uses `dsa-python/lessons/dsa-day-XX.md` filenames so
+it does not collide with the app sequence.
 
 ## What “the whole app is finished” means
 
@@ -708,8 +707,7 @@ boundaries.
 
 ## Day 11 — Associate tasks with owners and enforce authorization
 
-**Lesson:** Recommended continuation; create `lessons/app-day-11.md` when
-working through this day.  
+**Lesson:** [Day 11 — Add task ownership and authorization](../lessons/day-11.md)
 **Milestone:** Every task belongs to one signed-in user and users cannot access
 one another's tasks.
 
@@ -754,8 +752,7 @@ planning.
 
 ## Day 12 — Test authentication and user-data isolation
 
-**Lesson:** Recommended continuation; create `lessons/app-day-12.md` when
-working through this day.  
+**Lesson:** [Day 12 — Test authentication and user isolation](../lessons/day-12.md)
 **Milestone:** Automated tests prove protected routes and owner scoping work.
 
 ### Steps and substeps
@@ -793,8 +790,7 @@ mocking identity safely; privacy-preserving logs; defense in depth.
 
 ## Day 13 — Improve responsive design and accessibility
 
-**Lesson:** Recommended continuation; create `lessons/app-day-13.md` when
-working through this day.  
+**Lesson:** [Day 13 — Improve accessibility and responsive design](../lessons/day-13.md)
 **Milestone:** The app remains understandable and usable on keyboard, screen
 reader, and narrow-screen layouts.
 
@@ -835,8 +831,7 @@ responsive layout; status announcements; contrast; progressive enhancement.
 
 ## Day 14 — Deploy the app and configure production services
 
-**Lesson:** Recommended continuation; create `lessons/app-day-14.md` when
-working through this day.  
+**Lesson:** [Day 14 — Deploy with production services](../lessons/day-14.md)
 **Milestone:** A production build is deployed with a managed PostgreSQL
 database and authentication callback configuration.
 
@@ -880,8 +875,7 @@ environment parity.
 
 ## Day 15 — Final verification, documentation, and launch
 
-**Lesson:** Recommended continuation; create `lessons/app-day-15.md` when
-working through this day.  
+**Lesson:** [Day 15 — Verify, document, and launch](../lessons/day-15.md)
 **Milestone:** The deployed app is usable, its critical flows are verified,
 and another developer can run it from the documentation.
 
