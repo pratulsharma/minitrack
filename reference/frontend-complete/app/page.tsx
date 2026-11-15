@@ -1,11 +1,13 @@
+import { Suspense } from 'react';
+import { io } from 'next/cache';
 import TaskBoard from './TaskBoard';
 import { listTasks } from '../lib/tasks';
 import type { Task } from './types';
 
-export const dynamic = 'force-dynamic';
+// This subtree waits for request time while the surrounding page can prerender.
+async function TaskContent() {
+  await io();
 
-// Server Component: reads from PostgreSQL directly on the Next.js server.
-export default async function Home() {
   let tasks: Task[] = [];
   let error: string | null = null;
   try {
@@ -13,6 +15,21 @@ export default async function Home() {
   } catch (err) {
     error = err instanceof Error ? err.message : 'Unable to load tasks';
   }
+
+  return error ? (
+    <p
+      className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-rose-200"
+      role="alert"
+    >
+      Could not load tasks: {error} Check PostgreSQL and DATABASE_URL.
+    </p>
+  ) : (
+    <TaskBoard tasks={tasks} />
+  );
+}
+
+// Static navigation/header and request-time task data share the same route.
+export default function Home() {
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_50%_-18%,_rgb(91_75_180_/_22%),_transparent_48%)]">
       <nav
@@ -47,16 +64,15 @@ export default async function Home() {
             Keep your learning goals organized, one task at a time.
           </p>
         </header>
-        {error ? (
-          <p
-            className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-rose-200"
-            role="alert"
-          >
-            Could not load tasks: {error} Check PostgreSQL and DATABASE_URL.
-          </p>
-        ) : (
-          <TaskBoard tasks={tasks} />
-        )}
+        <Suspense
+          fallback={
+            <p className="rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-400">
+              Loading tasks...
+            </p>
+          }
+        >
+          <TaskContent />
+        </Suspense>
       </main>
     </div>
   );

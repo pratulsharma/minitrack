@@ -8,7 +8,7 @@ writing your own version. The active workspace begins with the output from
 `create-next-app` and grows in this order:
 
 1. Day 3: PostgreSQL driver, task data layer, validation, and GET/POST routes.
-2. Day 4: Tailwind-styled Server Component that renders database tasks.
+2. Day 4: Tailwind-styled Server Component with a static shell, Suspense, and request-time database tasks.
 3. Day 5: Client Component, responsive Tailwind UI, state, and mutations.
 
 To run this reference independently:

@@ -18,7 +18,11 @@ Browser (http://localhost:3000)
 2. **Node built-in HTTP in Days 1–2** — the checkpoint servers reveal `req`, `res`, methods, paths, status codes, and streams before the project moves to Route Handlers.
 3. **TypeScript for app and API code** — request data is treated as untrusted, database result shapes are explicit, and Route Handler inputs/outputs use web `Request`/`Response` APIs.
 4. **PostgreSQL with raw `pg` SQL** — learn `SELECT`, `INSERT`, `UPDATE`, `DELETE`, parameterization, and pooling before introducing an ORM.
-5. **Server Component reads initial tasks directly** — avoids making an unnecessary HTTP request from the Next.js server back to itself. `cache: 'no-store'` is not needed for this direct database query.
+5. **Server Component reads initial tasks directly** — avoids making an
+   unnecessary HTTP request from the Next.js server back to itself. With Cache
+   Components enabled, the static page shell wraps request-time database work
+   in `<Suspense>` and uses `io()` rather than the older route-wide
+   `dynamic = 'force-dynamic'` setting.
 6. **Client Component performs mutations through Route Handlers** — browser requests remain HTTP-visible, while server-only database credentials and SQL stay out of the client bundle.
 7. **Tailwind for focused styling** — utility classes make the dark responsive
    interface visible in the component while the lessons explain the underlying

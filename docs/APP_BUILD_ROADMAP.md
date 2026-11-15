@@ -408,7 +408,8 @@ PostgreSQL.
   - Explain why the database-facing row timestamp is converted to the app's string representation.
 - [ ] **2. Create the app layout and page**
   - Create or update `frontend/app/layout.tsx`.
-  - Implement `frontend/app/page.tsx` as an async Server Component.
+  - Keep the page shell static and move the asynchronous task read into a Server Component.
+  - Wrap that component in `<Suspense>` and call `io()` before request-time database work.
   - Call `listTasks()` directly on the server instead of making an HTTP request to the app's own API.
   - Render loading errors clearly and show each task with a stable React key.
   - Use Tailwind spacing, width, color, border, and state utilities; explain their CSS meaning.
@@ -420,6 +421,7 @@ PostgreSQL.
 ### Concepts to know
 
 Next.js App Router; Server Components; server-side data access; async rendering;
+Cache Components; `io()`; Suspense boundaries; static shells; request-time
 server-only database code; React rendering; stable list keys; error handling;
 avoiding an unnecessary internal HTTP hop; Tailwind layout and state utilities.
 

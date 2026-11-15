@@ -370,14 +370,16 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 Update `frontend/app/page.tsx` to read PostgreSQL in the Server Component and render the new component:
 
 ```tsx
+import { Suspense } from 'react';
+import { io } from 'next/cache';
 import TaskBoard from './TaskBoard';
 import { listTasks } from '../lib/tasks';
 import type { Task } from './types';
 
-export const dynamic = 'force-dynamic';
+async function TaskContent() {
+  // Exclude the database work from the prerendered static shell.
+  await io();
 
-// Server Component: reads PostgreSQL directly on the Next.js server.
-export default async function Home() {
   let tasks: Task[] = [];
   let error: string | null = null;
   try {
@@ -385,6 +387,21 @@ export default async function Home() {
   } catch (err) {
     error = err instanceof Error ? err.message : 'Unable to load tasks';
   }
+
+  return error ? (
+    <p
+      className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200"
+      role="alert"
+    >
+      Could not load tasks: {error}. Check PostgreSQL and DATABASE_URL.
+    </p>
+  ) : (
+    <TaskBoard tasks={tasks} />
+  );
+}
+
+// Static header plus a request-time task subtree.
+export default function Home() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
       <header className="mb-8">
@@ -397,20 +414,23 @@ export default async function Home() {
         </p>
       </header>
 
-      {error ? (
-        <p
-          className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200"
-          role="alert"
-        >
-          Could not load tasks: {error}. Check PostgreSQL and DATABASE_URL.
-        </p>
-      ) : (
-        <TaskBoard tasks={tasks} />
-      )}
+      <Suspense
+        fallback={
+          <p className="rounded-xl border border-slate-700 bg-slate-900 p-5 text-slate-400">
+            Loading tasks...
+          </p>
+        }
+      >
+        <TaskContent />
+      </Suspense>
     </main>
   );
 }
 ```
+
+With Cache Components enabled, do not add the older route-level
+`dynamic = 'force-dynamic'` setting. `io()` and `<Suspense>` keep only the
+database-dependent subtree at request time while preserving a static shell.
 
 
 ## 4. Run the app (10 min)

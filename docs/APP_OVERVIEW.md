@@ -123,7 +123,7 @@ The task representation and API routes may evolve as we learn; we'll document me
 
 | Technology | Why we're using it | What we'll avoid initially |
 |---|---|---|
-| **Next.js + React + TypeScript** | Learn rendering, hooks, component boundaries, SSR vs. client behavior | Hiding behavior behind unnecessary abstractions |
+| **Next.js + React + TypeScript** | Learn Server/Client boundaries, Cache Components, Suspense, hooks, and request-time rendering | Hiding behavior behind unnecessary abstractions |
 | **Tailwind CSS** | Learn utility-first layout, spacing, responsive breakpoints, and interaction states | Adding a second component library or unexplained design system |
 | **Node.js built-in HTTP in checkpoints** | Understand the raw request/response lifecycle and streams before using a framework | Hiding fundamentals behind a framework immediately |
 | **Next.js Route Handlers** | Implement a TypeScript API in the same app as the UI | Maintaining a separate local API server for a single Next.js project |

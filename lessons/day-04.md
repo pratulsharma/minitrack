@@ -105,12 +105,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 Then write `frontend/app/page.tsx`:
 
 ```tsx
+import { Suspense } from 'react';
+import { io } from 'next/cache';
 import { listTasks } from '../lib/tasks';
 import type { Task } from './types';
 
-export const dynamic = 'force-dynamic';
+async function TaskList() {
+  // io() keeps the database read out of the prerendered static shell.
+  await io();
 
-export default async function Home() {
   let tasks: Task[] = [];
   let error = '';
 
@@ -120,48 +123,61 @@ export default async function Home() {
     error = err instanceof Error ? err.message : 'Unknown error';
   }
 
+  if (error) {
+    return <p role="alert">Could not load tasks: {error}</p>;
+  }
+
+  return (
+    <>
+      <p className="mt-2 text-slate-400">{tasks.length} tasks</p>
+      <ul className="mt-8 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
+        {tasks.map(task => (
+          // Stable keys let React preserve item identity between renders.
+          <li
+            className="flex items-center gap-3 border-b border-slate-700 px-5 py-4 last:border-b-0"
+            key={task.id}
+          >
+            <span aria-hidden="true">{task.done ? '✅' : '⬜'}</span>
+            <span className={task.done ? 'text-slate-500 line-through' : ''}>
+              {task.title}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+export default function Home() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl px-5 py-12">
       <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">
         Your workspace
       </p>
       <h1 className="mt-3 text-4xl font-bold tracking-tight">MiniTrack</h1>
-      <p className="mt-2 text-slate-400">{tasks.length} tasks</p>
 
-      {error ? (
-        <p
-          className="mt-8 rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200"
-          role="alert"
-        >
-          Could not load tasks: {error}
-        </p>
-      ) : (
-        <ul className="mt-8 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
-          {tasks.map(task => (
-            // Stable keys let React preserve item identity between renders.
-            <li
-              className="flex items-center gap-3 border-b border-slate-700 px-5 py-4 last:border-b-0"
-              key={task.id}
-            >
-              <span aria-hidden="true">{task.done ? '✅' : '⬜'}</span>
-              <span className={task.done ? 'text-slate-500 line-through' : ''}>
-                {task.title}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* The fallback can prerender while TaskList waits for PostgreSQL. */}
+      <Suspense fallback={<p className="mt-8 text-slate-400">Loading tasks...</p>}>
+        <TaskList />
+      </Suspense>
     </main>
   );
 }
 ```
+
+Older Next.js courses often use `export const dynamic = 'force-dynamic'` to
+render the entire route for every request. This project enables Next.js 16
+Cache Components, so the current pattern is more precise: `io()` marks the
+database subtree as request-time work and `<Suspense>` provides a prerendered
+fallback while that work waits.
 
 Tailwind classes are still CSS concepts: `max-w-3xl` constrains width,
 `mx-auto` centers the page, `px-5 py-12` adds spacing, and `last:border-b-0`
 removes the final divider. Change one utility and inspect the result.
 
 
-Open `http://localhost:3000`. Expected: a `MiniTrack` heading, task count, and task list; the Server Component reads from PostgreSQL through the typed `pg` helper.
+Open `http://localhost:3000`. Expected: a `MiniTrack` heading, then the task
+count and list after the request-time Server Component reads PostgreSQL.
 
 ## 5. Debug + interview (25 min)
 
