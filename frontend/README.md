@@ -6,7 +6,10 @@ This directory is the learner workspace. It intentionally begins with only the
 Next.js scaffold and a small Tailwind verification card. Database modules,
 Route Handlers, and interactive components are created gradually in
 [`../lessons/day-03.md`](../lessons/day-03.md) through
-[`../lessons/day-05.md`](../lessons/day-05.md).
+[`../lessons/day-05.md`](../lessons/day-05.md). Continue with
+[`../lessons/day-06.md`](../lessons/day-06.md) through
+[`../lessons/day-10.md`](../lessons/day-10.md) for editing, URL-backed
+search, isolated tests, and GitHub sign-in.
 
 Tailwind v4 is initialized by `postcss.config.mjs` and
 `app/globals.css`. Comments in the starter code explain the connection between

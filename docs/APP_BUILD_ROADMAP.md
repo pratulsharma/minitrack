@@ -11,9 +11,9 @@ scaffold. Build it in lesson order; completed future code is isolated under
 your own progress.
 
 **Important:** The repository currently has full-stack app lessons for Days
-1–5. The Days 6–15 below are the recommended continuation for this app; the
-existing numbered lessons after Day 5 are a separate Python DSA track. Do not
-mistake those DSA lesson numbers for app progress.
+1–10. Days 11–15 below are the planned continuation. The canonical Python DSA
+track uses `dsa-python/lessons/dsa-day-XX.md` filenames so it does not collide
+with the app sequence.
 
 ## What “the whole app is finished” means
 
@@ -40,7 +40,7 @@ work.
 | 7 | Add the edit experience to the browser | [ ] Not started |
 | 8 | Add persistent search and server-side filtering | [ ] Not started |
 | 9 | Add automated tests for app and database behavior | [ ] Not started |
-| 10 | Add sign-in using a maintained authentication provider | [ ] Not started |
+| 10 | Add GitHub sign-in using Auth.js | [ ] Not started |
 | 11 | Restrict task data and mutations to the signed-in owner | [ ] Not started |
 | 12 | Test authentication, authorization, and user-data isolation | [ ] Not started |
 | 13 | Polish responsive layout and accessibility | [ ] Not started |
@@ -503,15 +503,15 @@ Tailwind utilities; conditional classes; testing.
 
 ## Day 6 — Add task-title editing to the data layer and API
 
-**Lesson:** Recommended continuation; create `lessons/app-day-06.md` when
-working through this day.  
+**Lesson:** [Day 6 — Edit task titles](../lessons/day-06.md)
+
 **Milestone:** A task title can be updated through a validated API request.
 
 ### Steps and substeps
 
 - [ ] **1. Define the update contract**
-  - Decide whether `PATCH` accepts `title`, `done`, or both optional fields.
-  - Validate that at least one supported field is present and valid.
+  - Accept exactly one supported field per `PATCH`: `title` or `done`.
+  - Reject missing fields, both fields together, and invalid values.
   - Keep the existing completion checkbox behavior working.
 - [ ] **2. Update the database function**
   - Extend `frontend/lib/tasks.ts` with a typed task-update operation.
@@ -544,8 +544,8 @@ between route, validation, and database layers.
 
 ## Day 7 — Add the edit experience to the browser
 
-**Lesson:** Recommended continuation; create `lessons/app-day-07.md` when
-working through this day.  
+**Lesson:** [Day 7 — Build the browser editing UI](../lessons/day-07.md)
+
 **Milestone:** A user can edit a task title and see success or failure clearly.
 
 ### Steps and substeps
@@ -582,8 +582,8 @@ transitions; async UI; optimistic updates versus refresh; accessible form labels
 
 ## Day 8 — Add search and persistent server-side filters
 
-**Lesson:** Recommended continuation; create `lessons/app-day-08.md` when
-working through this day.  
+**Lesson:** [Day 8 — Add URL search and server-side filters](../lessons/day-08.md)
+
 **Milestone:** Search and status filters are shareable through the URL and
 applied by PostgreSQL.
 
@@ -624,8 +624,8 @@ measured optimization.
 
 ## Day 9 — Add automated tests for the app
 
-**Lesson:** Recommended continuation; create `lessons/app-day-09.md` when
-working through this day.  
+**Lesson:** [Day 9 — Add unit, integration, and browser tests](../lessons/day-09.md)
+
 **Milestone:** Important route, UI, and database behavior has repeatable tests.
 
 ### Steps and substeps
@@ -634,9 +634,9 @@ working through this day.
   - Run the existing frontend tests and identify the validation behavior already covered.
   - Separate pure unit tests from tests that require PostgreSQL or a browser.
 - [ ] **2. Test request and data behavior**
-  - Test valid and invalid request bodies, IDs, filters, and update combinations.
-  - Add Route Handler tests for success, validation errors, missing rows, and server failures.
-  - Use an isolated test database for database integration tests; never point tests at personal data.
+  - Test pure title and filter normalization with the Node test runner.
+  - Add a PostgreSQL integration test that proves a task update persists.
+  - Use an isolated test database with a safety guard; never point tests at personal data.
 - [ ] **3. Test the user journey**
   - Add browser-level checks for create, complete, edit, search/filter, and delete.
   - Include empty states, error states, and a reload where useful.
@@ -661,20 +661,21 @@ versus real dependencies; deterministic tests; regression testing; type checking
 
 ---
 
-## Day 10 — Add sign-in with a maintained authentication provider
+## Day 10 — Add GitHub sign-in with Auth.js
 
-**Lesson:** Recommended continuation; create `lessons/app-day-10.md` when
-working through this day.  
+**Lesson:** [Day 10 — Add GitHub sign-in with Auth.js](../lessons/day-10.md)
+
 **Milestone:** Users can sign in and sign out using a maintained provider.
 
 ### Steps and substeps
 
-- [ ] **1. Choose and document the authentication approach**
-  - Compare a maintained auth library/provider with implementing credentials yourself.
-  - Prefer a maintained provider for this learning app; record the chosen provider and required local environment variables.
+- [ ] **1. Document the authentication approach**
+  - Use Auth.js with GitHub OAuth instead of implementing credentials.
+  - Record `AUTH_SECRET`, `AUTH_GITHUB_ID`, and `AUTH_GITHUB_SECRET`.
   - Keep provider secrets out of source control and browser bundles.
-- [ ] **2. Add the provider's supported Next.js integration**
-  - Follow the provider's current official setup guide for this app's Next.js version.
+- [ ] **2. Add Auth.js using its supported Next.js integration**
+  - Recheck the current official Auth.js setup guide before installing `next-auth@beta`.
+  - Create root `auth.ts` and the `app/api/auth/[...nextauth]/route.ts` handler.
   - Add sign-in and sign-out controls and a clear unauthenticated state.
   - Verify session state is available only through the supported server/client interfaces.
 - [ ] **3. Protect app entry points**
@@ -696,7 +697,7 @@ boundaries.
 1. **What is the difference between authentication and authorization?** —
    Authentication establishes who the user is; authorization decides what that
    user may access.
-2. **Why prefer a maintained authentication provider for a small app?** —
+2. **Why prefer Auth.js and GitHub OAuth for this learning app?** —
    Session and identity security are complex, and a supported provider reduces
    custom security-sensitive code.
 3. **Why is hiding a page link not access control?** — A user can call an API

@@ -65,3 +65,43 @@ What if Postgres goes down? Query rejects, handler catches it and returns a serv
 ## Day 4
 
 ## Day 5
+
+## Day 6 — API title editing
+
+- What:
+- Why:
+- How:
+- Code:
+- Trick:
+
+## Day 7 — Browser editing state
+
+- What:
+- Why:
+- How:
+- Code:
+- Trick:
+
+## Day 8 — URL search and PostgreSQL filters
+
+- What:
+- Why:
+- How:
+- Code:
+- Trick:
+
+## Day 9 — Test pyramid and isolation
+
+- What:
+- Why:
+- How:
+- Code:
+- Trick:
+
+## Day 10 — Auth.js and GitHub OAuth
+
+- What:
+- Why:
+- How:
+- Code:
+- Trick:

@@ -1,15 +1,18 @@
-# Week 1 architecture and decisions
+# MiniTrack architecture through Day 10
+
+The architecture evolves by lesson. The isolated completed reference represents
+the Day 5 MVP; Days 6–10 teach the additions shown below.
 
 ```text
 Browser (http://localhost:3000)
-  ├── Next.js Server Component: reads tasks from PostgreSQL
-  └── React Client Component: POST/PATCH/DELETE to Next.js Route Handlers
+  ├── Next.js Server Components: session, URL filters, PostgreSQL reads
+  └── React Client Components: POST/PATCH/DELETE to Route Handlers
                                   |
-                         Next.js app (TypeScript)
-                                  |
-                             pg Pool / SQL
-                                  |
-                             PostgreSQL
+                    Next.js app (TypeScript)
+                      ├── Auth.js session checks ─── GitHub OAuth
+                      └── pg Pool / parameterized SQL
+                                      |
+                                  PostgreSQL
 ```
 
 ## Why this architecture?
@@ -28,8 +31,19 @@ Browser (http://localhost:3000)
    interface visible in the component while the lessons explain the underlying
    layout, spacing, color, breakpoint, and interaction-state concepts. No
    additional component library or design system is required.
-8. **Tasks are a single table** — `id` identity primary key, `title` text, `done` boolean, `created_at` timestamp. No login/users yet.
+8. **URL-backed search is server-side** — Day 8 validates `q` and `status`,
+   then PostgreSQL filters with bound values. The URL remains bookmarkable and
+   reload-safe.
 9. **Fail safely on database errors** — API returns a generic 500 response while diagnostic details are logged on the server.
+10. **Tests use an isolated database** — Day 9 separates pure unit tests,
+    PostgreSQL integration tests, and a small Playwright journey. Destructive
+    setup refuses the development database.
+11. **Auth.js handles identity** — Day 10 uses GitHub OAuth and checks
+    `auth()` in private Server Components and every task Route Handler. Secrets
+    remain server-only.
+12. **Authentication precedes ownership** — through Day 10, tasks still use one
+    table with `id`, `title`, `done`, and `created_at`. App Day 11 adds owner
+    identifiers and owner-scoped SQL.
 
 ## Data flow: adding a task
 
@@ -40,11 +54,30 @@ Browser (http://localhost:3000)
 5. PostgreSQL persists it and returns its ID.
 6. Route Handler returns JSON; `router.refresh()` re-renders the Server Component, which queries PostgreSQL.
 
-## Trade-offs and future extensions
+## Data flow: searching
 
-- **No authentication** — multiuser isolation arrives later.
+1. The browser submits a GET form with `q` and `status`.
+2. The Server Component validates and normalizes `searchParams`.
+3. The task function escapes literal wildcard characters and binds SQL values.
+4. PostgreSQL applies title and completion filters.
+5. Next.js streams the request-time result inside the static shell.
+
+## Data flow: authentication
+
+1. The user chooses GitHub sign-in.
+2. Auth.js redirects to GitHub and validates the callback.
+3. Auth.js creates a signed session cookie.
+4. Server Components and Route Handlers call `auth()`.
+5. Anonymous task requests return `401`; authenticated requests continue.
+
+## Current trade-offs and next extensions
+
+- **No per-user authorization through Day 10** — authentication exists, but
+  all signed-in users still share tasks until owner-scoped queries arrive on
+  Day 11.
 - **No optimistic UI** — first learn correct server-as-source-of-truth refresh; optimize later.
 - **No separate API framework** — Fastify/Express can be compared when the app needs an independent API service.
 - **No advanced validation** — simple checks only; add schema libraries when useful.
 - **No pagination/index optimization yet** — first learn queries; add data volume and `EXPLAIN ANALYZE` later.
-- **No automated integration tests yet** — tiny unit tests exercise reusable pure functions; DB tests are a later lesson.
+- **A deliberately small test suite** — Day 9 covers representative unit,
+  integration, and browser behavior rather than every possible combination.

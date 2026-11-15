@@ -613,4 +613,6 @@ Content-Type: application/json
 
 **Commit:** `git add . && git commit -m "day5: complete week1 task CRUD"`
 
-**Next week:** authentication, search, database indexing, and deeper Node/React interview scenarios; don't add them to Week 1.
+**Next:** [Day 6](day-06.md) adds task-title editing to the data layer and API.
+Continue through Day 10 for the browser editing UI, URL-backed
+search, automated tests, and GitHub authentication.
