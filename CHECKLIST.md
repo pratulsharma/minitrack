@@ -16,14 +16,14 @@ unchecked until that milestone has been completed and verified.
 - [ ] Day 5 create, complete, filter and delete from browser
 - [ ] Day 5 `cd frontend && npm test && npx tsc --noEmit && npm run build` passes
 - [ ] Day 6 task-title PATCH validation and persistence work
-- [ ] Day 7 edit, save, cancel, and failure states work in the browser
+- [ ] Day 7 edit, save, cancel, focus, and failure states work in the browser
 - [ ] Day 8 search and status filters survive reload through the URL
 - [ ] Day 9 unit, isolated integration, and browser tests pass
-- [ ] Day 10 GitHub sign-in/sign-out works and anonymous task API calls return `401`
+- [ ] Day 10 GitHub sign-in/sign-out and client session Context work; anonymous task API calls return `401`
 - [ ] Day 10 I can explain why task ownership still waits for Day 11
 - [ ] Day 11 every task query and mutation is scoped by the session owner
 - [ ] Day 12 automated tests prove anonymous and cross-user access is blocked
-- [ ] Day 13 keyboard, accessible-name, focus, zoom, and narrow-screen checks pass
+- [ ] Day 13 accessibility checks pass and I can explain measured React memoization
 - [ ] Day 14 production HTTPS, OAuth callback, PostgreSQL, and smoke tests work
 - [ ] Day 15 release checks, documentation, recovery plan, and system explanation are complete
 - [ ] `.env` and `.env.local` are NOT committed

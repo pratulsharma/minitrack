@@ -27,6 +27,8 @@ For every lesson verify:
 ## Architecture quality
 
 - Persistent data has one source of truth.
+- React apps use refs/effects for external synchronization, Context for
+  genuinely shared descendant data, and memoization only after measurement.
 - Untrusted data is validated at boundaries.
 - SQL or equivalent queries bind values.
 - Authentication and authorization are treated separately.
@@ -61,4 +63,3 @@ For every lesson verify:
 - Confirm no secret values, session tokens, personal data, or production URLs
   were added.
 - Report checks actually run; do not imply unrun validation passed.
-

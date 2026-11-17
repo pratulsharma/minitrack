@@ -16,6 +16,8 @@ and narrow or wide screens.
 - use semantic regions and native controls;
 - provide accessible names, errors, and status announcements;
 - manage focus during editing and async work;
+- explain the Auth.js session Context introduced on Day 10;
+- measure before applying `useMemo`, `useCallback`, or `React.memo`;
 - build mobile-first layouts without horizontal overflow;
 - verify behavior instead of judging only appearance.
 
@@ -167,7 +169,68 @@ sequenceDiagram
   B-->>K: Visible and announced updated state
 ```
 
-## 7. Verify with tools and people
+## 7. Add a focused React interview lab
+
+Day 10 uses Auth.js `SessionProvider` and `useSession()` as the practical
+Context example. Context distributes the client-visible session without prop
+drilling, but `auth()` still protects server entry points.
+
+Do not move PostgreSQL tasks into Context because that would duplicate server
+state. Use this lesson's extra lab for measured memoization instead.
+
+### Measure memoization instead of guessing
+
+Use the React Profiler before and after this small experiment:
+
+```tsx
+import { memo, useCallback, useMemo } from 'react';
+
+const counts = useMemo(() => {
+  return {
+    open: tasks.filter(task => !task.done).length,
+    done: tasks.filter(task => task.done).length,
+  };
+}, [tasks]);
+```
+
+This avoids recalculating the counts when unrelated local state changes while
+the `tasks` array reference stays the same. For a small list, the calculation
+is cheap and plain rendering may be clearer.
+
+To explore stable props:
+
+```tsx
+const startEditing = useCallback((task: Task) => {
+  setEditingId(task.id);
+  setEditTitle(task.title);
+}, []);
+
+const TaskRow = memo(function TaskRow({
+  task,
+  onEdit,
+}: {
+  task: Task;
+  onEdit: (task: Task) => void;
+}) {
+  return (
+    <li>
+      <span>{task.title}</span>
+      <button type="button" onClick={() => onEdit(task)}>
+        Edit
+      </button>
+    </li>
+  );
+});
+```
+
+`React.memo` performs a shallow prop comparison. `useCallback` keeps the
+callback reference stable so it does not defeat that comparison. A refreshed
+server result may create new task objects, so memoization cannot prevent every
+row render.
+
+Keep these optimizations only when profiling shows a useful improvement.
+
+## 8. Verify with tools and people
 
 Run:
 
@@ -184,6 +247,7 @@ Then verify manually:
 3. Test 320px, tablet, and desktop widths.
 4. Inspect the accessibility tree in browser developer tools.
 5. If available, test VoiceOver or another screen reader.
+6. Use the React Profiler to compare the memoization experiment.
 
 Automated tools help find issues; they do not prove usability.
 
@@ -194,6 +258,9 @@ Automated tools help find issues; they do not prove usability.
 3. Communicate completion only with green/gray colors.
 4. Use `div onClick` instead of a button and test Enter/Space.
 5. Force task actions into one fixed-width row and test 320px.
+6. Put `tasks` into Context and identify the duplicated source of truth.
+7. Pass a new inline callback into `TaskRow` and observe why `React.memo` no
+   longer skips the render.
 
 ## Tricky interview questions and answers (20 min)
 
@@ -243,9 +310,49 @@ a real workflow is usable.
 **Senior follow-up:** Combine automated checks, keyboard testing, accessibility
 tree inspection, and testing with disabled users when possible.
 
+### Q5. When should you use Context?
+
+**Interview-ready answer:** Use Context for values needed by distant
+descendants when repeatedly passing props would obscure the component API.
+Context is not automatically a replacement for application or server state.
+
+**Example:** Auth.js session display is suitable; PostgreSQL-backed tasks are
+not duplicated into Context.
+
+**Senior follow-up:** Context value changes rerender consumers. Split contexts
+by responsibility and keep values stable when measurement justifies it.
+
+### Q6. What is the difference between `useMemo`, `useCallback`, and `React.memo`?
+
+**Interview-ready answer:** `useMemo` caches a computed value, `useCallback`
+caches a function reference, and `React.memo` may skip rendering a component
+when its props are shallowly equal.
+
+**Example:** A memoized `TaskRow` can still rerender if it receives a newly
+created callback on every parent render.
+
+**Senior follow-up:** They are performance tools, not correctness tools. Their
+dependency arrays must be accurate, and their overhead can exceed the saved
+work.
+
+### Q7. When should you avoid `useEffect`?
+
+**Interview-ready answer:** Avoid it for values that can be calculated during
+rendering or for event-specific logic that belongs in the event handler.
+Effects synchronize React with external systems.
+
+**Example:** Focus synchronization needs an effect; filtering `tasks` does not.
+
+**Senior follow-up:** Incorrect dependencies can produce stale closures,
+repeated work, or loops. Removing an unnecessary effect is often better than
+fixing it.
+
 ## Complexity
 
 - Rendering remains `O(n)` for `n` visible tasks.
+- The count calculation is `O(n)` and `useMemo` reuses it only while the
+  `tasks` dependency remains referentially equal.
+- Context updates rerender consuming components.
 - Accessibility usually adds semantics and verification, not meaningful
   algorithmic cost.
 - Responsive CSS adds no JavaScript state when layout can be expressed in CSS.
@@ -256,6 +363,9 @@ tree inspection, and testing with disabled users when possible.
 - [ ] The complete flow works with keyboard only.
 - [ ] Focus is visible and logical.
 - [ ] Errors and status changes are perceivable.
+- [ ] Client auth UI uses Context without replacing server `auth()` checks.
+- [ ] I can distinguish `useMemo`, `useCallback`, and `React.memo`.
+- [ ] I used the Profiler before deciding whether memoization helps.
 - [ ] Completion is not communicated by color alone.
 - [ ] No horizontal overflow appears at narrow widths or 200% zoom.
 

@@ -140,8 +140,54 @@ queries can use connections while the 11th request waits. If requests arrive fas
 
 - now we will start the FE with create-next-app rather than completed code 
 - here we start with deleting the existing main page.tsx code 
+>11/15/26
+- So we will write a server side code that will directly invoke the db get the output 
+- and display as a list of tasks ; a new thing we will use us suspence -> we use it for 
+- providing the loading...
+- a new thing I am learning here is that when this server based page is invoking and DB its not storing the output in a state; its storing it in JS variable and mapping it through to display the list of tasks 
+- since we are starting from scratch again I need to setup the BE again -- so what all was in the backend 
+- tasks.ts --> functions that was interacting with the DB listTasks and writeTask function 
+- route handles in api/tasks (so that when we .. checj why the path for the api matters) that will handle the api calls; this route handler would intern call the listTasks and writeTasks functions from tasks.ts file and handle GET and POST requests. 
+- we also need a validation --> of the title --> is it string? if yes then trim the end
+- we also need a dababase driver function (in db.ts) -> this is for creating pools and then querying the DB using this driver
+- we also need DB schema and the type for the tasks object/row 
+- now lets work on the FE 
+- first write a server page that will directly invoke the listTask and display the list of tasks 
+- we will create a TaskList function that will 1) invoke the listTasks function -> assign it to some variable and then display the list --> 
 
+>11/16/26
+- handling a map in react to display the list 
+  - generally use li and inside that use a key -> something unique 
+  - use span to display the items inside it 
+  - ARIA means Accessible Rich Internet Applications.
+  - ARIA attributes help assistive technologies, such as screen readers, understand an interface
+  - so some stuff learned along the way --> we can use suspense with fallback 
+  >     <Suspense fallback={<p>Loading tasks...</p>}> <TaskList /> </Suspense>
+  - we also learn that we can use conditionals in the class, also use line through based on the condition
+  >     <span className={r.done ? "text-slate-300 textline-through" : "" }>{r.title}</span>
+  - also checkbox
+  >      <span aria-hidden="true">{r.done ? '✅' : '⬜'}</span>
 
+ #### Interview questions: 
 
+ - what is the difference between server and client components?
+   - the server component can directly access the server side resources like postgres db, it does not send the js to browser.
+   - client component is needed when we need interactive pages -> forms etc - forms etc, when we need useState etc. 
+ - what is hydration?
+    - a page is rendered by server side, then on top of it a clint side page updates it. 
+    - Common problem: A hydration mismatch occurs when the client initially renders different content from the server, for example by rendering Date.now() or a browser-only value during the first render without handling the difference.
+- why not use initial tasks using useEffect?
+    - so that the first page load uses server side component, it also saves the extra trip to backend. 
+- Why must secrets stay out of browser code?
+    - browser code can be instected by the user. Secrets need to be hidden.
+-  What is a React list key, and why should it be stable?
+Interview-ready answer: A key identifies an item among its siblings so React can match that item between renders. A stable database ID helps React preserve the correct component state and update only the items that were inserted, removed, or reordered.
 
+> tasks.map(task => <li key={task.id}>{task.title}</li>)
+- Using the array index can cause state to follow the wrong visible item after a deletion or reorder. If the first item is removed, every later index changes even though those task identities did not.
 
+- Important nuance: key is used internally by React and is not passed to the component as a normal prop. Pass task.id separately if the child component needs the ID.
+
+> day-05
+- Now we will add PATCH (update) and DELETE to the route handlee
+- PATCH is update --> I think we use 

@@ -39,8 +39,9 @@ Browser (http://localhost:3000)
     PostgreSQL integration tests, and a small Playwright journey. Destructive
     setup refuses the development database.
 11. **Auth.js handles identity** — Day 10 uses GitHub OAuth and checks
-    `auth()` in private Server Components and every task Route Handler. Secrets
-    remain server-only.
+    `auth()` in private Server Components and every task Route Handler.
+    `SessionProvider` shares the resulting session with Client Components but
+    is not an authorization boundary. Secrets remain server-only.
 12. **Ownership is enforced in SQL** — Day 11 adds Auth.js database users and
     `tasks.owner_id`; every operation derives the owner from the session and
     includes it in the query predicate.

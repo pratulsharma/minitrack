@@ -17,6 +17,8 @@ You will practice:
 
 - modeling UI modes with explicit React state;
 - controlled edit inputs;
+- referencing a DOM input with `useRef`;
+- synchronizing focus with `useEffect`;
 - immutable props and server state;
 - accessible edit/save/cancel controls;
 - handling pending, success, cancellation, and failure transitions.
@@ -28,6 +30,7 @@ Add two pieces of temporary UI state to `TaskBoard`:
 ```ts
 const [editingId, setEditingId] = useState<string | null>(null);
 const [editTitle, setEditTitle] = useState('');
+const editInputRef = useRef<HTMLInputElement>(null);
 ```
 
 `editingId` answers **which task is being edited**. `editTitle` holds the
@@ -65,7 +68,31 @@ function cancelEditing() {
 Why copy the title into state? The input needs a draft the user can change
 without mutating the `task` prop.
 
-## 3. Submit the draft
+## 3. Focus the input with `useRef` and `useEffect`
+
+Import the hooks:
+
+```ts
+import { useEffect, useRef, useState } from 'react';
+```
+
+`useRef` keeps a reference to the rendered input without causing a rerender.
+`useEffect` synchronizes React state with the browser DOM after the edit input
+has been committed:
+
+```ts
+useEffect(() => {
+  if (editingId) {
+    editInputRef.current?.focus();
+    editInputRef.current?.select();
+  }
+}, [editingId]);
+```
+
+This is an appropriate effect because focus is an external browser operation.
+Do not use an effect to calculate values that can be derived during rendering.
+
+## 4. Submit the draft
 
 Reuse the Day 5 request helper:
 
@@ -97,7 +124,7 @@ async function saveTask(event: React.FormEvent<HTMLFormElement>) {
 Do not write `task.title = editTitle`. Props describe parent-owned input and
 must not become a second writable database.
 
-## 4. Render viewing or editing mode
+## 5. Render viewing or editing mode
 
 Inside `visible.map`, replace only the title/action portion:
 
@@ -113,10 +140,10 @@ Inside `visible.map`, replace only the title/action portion:
     <input
       id={`edit-${task.id}`}
       className="min-h-10 min-w-0 flex-1 rounded-lg border border-violet-400 bg-slate-950 px-3 outline-none"
+      ref={editInputRef}
       value={editTitle}
       onChange={event => setEditTitle(event.target.value)}
       maxLength={200}
-      autoFocus
       disabled={busy}
     />
     <button
@@ -156,10 +183,10 @@ Inside `visible.map`, replace only the title/action portion:
 ```
 
 `sr-only` gives the input an accessible label without adding visible clutter.
-`autoFocus` is useful here because entering edit mode is an explicit user
-action. Do not add it to every input by default.
+The ref/effect pair focuses and selects the draft only when `editingId`
+changes.
 
-## 5. Understand the full interaction
+## 6. Understand the full interaction
 
 ```mermaid
 sequenceDiagram
@@ -182,7 +209,7 @@ sequenceDiagram
   C->>C: Leave editing mode
 ```
 
-## 6. Keyboard and failure checks
+## 7. Keyboard and failure checks
 
 Verify:
 
@@ -205,6 +232,8 @@ Introduce and diagnose these bugs:
 - Clear editing state before awaiting the API.
 - Remove `event.preventDefault()`.
 - Use one boolean `isEditing` without storing which task is active.
+- Remove `editingId` from the effect dependency array and explain the stale
+  synchronization risk.
 
 For each bug, state which transition becomes incorrect.
 
@@ -261,6 +290,18 @@ and incorrectly restores the older title.
 **Senior follow-up:** Track request identity, abort superseded requests, or use
 version checks when concurrent edits must be supported.
 
+### Q5. What is the difference between `useRef` and `useEffect` here?
+
+**Interview-ready answer:** `useRef` stores a stable reference to the input DOM
+node without causing renders. `useEffect` runs after React commits the edit UI
+and uses that reference to synchronize browser focus.
+
+**Example:** Setting `editingId` renders the input first; the effect then calls
+`editInputRef.current?.focus()`.
+
+**Senior follow-up:** Refs are an escape hatch for imperative APIs. Do not use
+them as hidden state when a value should drive rendering.
+
 ## Complexity
 
 - Finding and rendering the visible task list is `O(n)`.
@@ -273,6 +314,7 @@ version checks when concurrent edits must be supported.
 - [ ] Save persists after reload.
 - [ ] Cancel makes no request.
 - [ ] Blank titles and API failures are visible.
+- [ ] Entering edit mode focuses and selects the current title.
 - [ ] Keyboard users can reach every control.
 - [ ] I can describe viewing, editing, and saving transitions.
 

@@ -24,6 +24,7 @@ cannot read or mutate tasks.
 - distinguish authentication from authorization;
 - configure OAuth without exposing secrets;
 - read sessions in Server Components and Route Handlers;
+- read shared session state in Client Components through Context;
 - implement sign-in and sign-out with Server Actions;
 - explain why Day 11 must add task ownership.
 
@@ -145,6 +146,68 @@ export default async function AuthControls() {
 
 These forms use Server Actions, so provider operations and session logic stay
 on the server.
+
+### Read the session from Auth.js Context when a Client Component needs it
+
+Server Components should continue using `auth()`. For an interactive Client
+Component that needs the same session, Auth.js provides `SessionProvider`,
+which uses React Context internally.
+
+Create `frontend/app/AuthSessionProvider.tsx`:
+
+```tsx
+'use client';
+
+import type { Session } from 'next-auth';
+import { SessionProvider } from 'next-auth/react';
+import type { ReactNode } from 'react';
+
+export default function AuthSessionProvider({
+  children,
+  session,
+}: {
+  children: ReactNode;
+  session: Session | null;
+}) {
+  return (
+    <SessionProvider session={session}>
+      {children}
+    </SessionProvider>
+  );
+}
+```
+
+A descendant Client Component can use the Context-backed hook:
+
+```tsx
+'use client';
+
+import { useSession } from 'next-auth/react';
+
+export default function ClientSessionSummary() {
+  const { data: session, status } = useSession();
+
+  if (status === 'loading') return <p>Checking session...</p>;
+  if (!session?.user) return <p>Not signed in</p>;
+
+  return <p>Signed in as {session.user.name ?? session.user.email}</p>;
+}
+```
+
+Pass the server-verified session into the provider around only the interactive
+subtree that needs it:
+
+```tsx
+const session = await auth();
+
+<AuthSessionProvider session={session}>
+  <ClientSessionSummary />
+</AuthSessionProvider>
+```
+
+Context avoids passing the session through every intermediate Client Component.
+It does **not** protect Route Handlers, and hiding client UI is still not
+authorization.
 
 ## 5. Protect the page
 
@@ -336,6 +399,18 @@ response, commonly `403` or a non-enumerating `404`.
 **Senior follow-up:** Be consistent and consider whether revealing resource
 existence creates an information leak.
 
+### Q6. Can React Context handle authentication?
+
+**Interview-ready answer:** Context can distribute already established session
+state to Client Components. It does not verify identity or authorize server
+operations; Auth.js and server checks perform those security responsibilities.
+
+**Example:** `SessionProvider` and `useSession()` can render an account menu,
+while the task Route Handler still calls `auth()`.
+
+**Senior follow-up:** Client session state improves UI behavior but is not a
+trusted enforcement boundary because clients can be modified or bypassed.
+
 ## Complexity
 
 Application-level session checks are `O(1)`, but real latency is dominated by
@@ -346,6 +421,7 @@ redirects. Security correctness matters more than micro-optimizing this path.
 
 - [ ] Auth.js secrets exist only in ignored environment files.
 - [ ] GitHub sign-in and sign-out work.
+- [ ] A Client Component can read the session through `SessionProvider`.
 - [ ] Anonymous page access shows sign-in.
 - [ ] Every task API method rejects anonymous requests.
 - [ ] I can explain why task ownership is still missing.

@@ -19,16 +19,19 @@
 | HTTP idempotency | `lessons/day-05.md` | Can retrying POST create duplicates? |
 | Partial updates | `lessons/day-06.md` | Why use PATCH and `UPDATE ... RETURNING`? |
 | Controlled edit state | `lessons/day-07.md` | Which edit values belong in React state? |
+| `useRef` / `useEffect` | `lessons/day-07.md` | Why is focus an effect but filtering is not? |
 | URL-backed state | `lessons/day-08.md` | Why store shareable filters in the URL? |
 | SQL wildcard behavior | `lessons/day-08.md` | Does parameterization escape `%` and `_`? |
 | Test pyramid / isolation | `lessons/day-09.md` | Which behavior belongs at each test level? |
 | Authentication / authorization | `lessons/day-10.md` | Why does a valid session not prove row access? |
+| Context / `SessionProvider` | `lessons/day-10.md` | What can auth Context do, and what can it not secure? |
 | Server-side access control | `lessons/day-10.md` | Why is hiding a button not protection? |
 | Ownership-scoped SQL / IDOR | `lessons/day-11.md` | Why include owner ID in every task predicate? |
 | Schema migration safety | `lessons/day-11.md` | How do you add a required owner to existing rows? |
 | Authorization test matrix | `lessons/day-12.md` | Why test both the response and unchanged data? |
 | Semantic HTML / focus | `lessons/day-13.md` | Why prefer native controls and deliberate focus? |
 | Responsive accessibility | `lessons/day-13.md` | What must remain usable beyond visual resizing? |
+| React memoization | `lessons/day-13.md` | How do `useMemo`, `useCallback`, and `React.memo` differ? |
 | Deployment configuration | `lessons/day-14.md` | What differs between build-time and runtime config? |
 | Migration rollback | `lessons/day-14.md`, `lessons/day-15.md` | Why is app rollback different from schema recovery? |
 | End-to-end system trace | `lessons/day-15.md` | Can I explain one PATCH from browser to PostgreSQL and back? |

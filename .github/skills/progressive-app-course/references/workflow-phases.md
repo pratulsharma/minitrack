@@ -12,13 +12,13 @@ Combine or split days to match learner pace while preserving the order of ideas.
 | Official scaffold | Generated framework app inspected before modification | Files, build tools, styling |
 | Persistence | Real database schema and typed data layer | SQL, validation, pooling, migrations |
 | Read path | Server-rendered or API-backed persisted data | Server/client boundaries, caching semantics |
-| Browser mutations | Create/update/delete from the UI | State, forms, errors, refresh/reconciliation |
+| Browser mutations | Create/update/delete from the UI | State, forms, refs, effects, errors, refresh/reconciliation |
 | Editing and query state | Edit, search, filter, pagination | URL state, races, indexing |
 | Testing | Unit, database integration, and critical E2E journey | Isolation, determinism, test pyramid |
-| Authentication | Maintained identity/session solution | OAuth/credentials trade-offs, cookies, secrets |
+| Authentication | Maintained identity/session solution | OAuth/credentials trade-offs, cookies, client Context, server trust boundaries |
 | Authorization | Resource ownership enforced in data operations | IDOR prevention, least privilege |
 | Security tests | Anonymous and cross-user negative tests | Test matrices, privacy-safe artifacts |
-| Accessibility | Keyboard, semantics, focus, feedback, responsive layout | WCAG-oriented behavior |
+| Accessibility and React review | Keyboard, semantics, focus, feedback, responsive layout | WCAG behavior, Context, measured memoization |
 | Deployment | Managed services, secrets, migrations, HTTPS, smoke tests | Build/runtime config, rollback |
 | Release | Clean-install gate, recovery docs, full system explanation | Operations, documentation, interview synthesis |
 
@@ -67,4 +67,3 @@ The initial app should have:
 
 Move teams, billing, real-time collaboration, multi-region operation, sharding,
 and microservices to optional future work unless they define the app itself.
-

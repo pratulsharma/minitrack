@@ -571,6 +571,7 @@ between route, validation, and database layers.
   - Keep the current title visible and make cancel restore the non-editing view.
 - [ ] **2. Implement the Client Component behavior**
   - Track the edited task ID and draft title in React state.
+  - Use `useRef` and `useEffect` to focus the input after edit mode renders.
   - Submit the title to the `PATCH` endpoint.
   - Handle empty input, pending requests, API errors, and successful completion.
 - [ ] **3. Refresh the server-rendered list**
@@ -582,8 +583,9 @@ between route, validation, and database layers.
 
 ### Concepts to know
 
-Controlled forms; local versus server state; immutable props; component state
-transitions; async UI; optimistic updates versus refresh; accessible form labels.
+Controlled forms; local versus server state; `useRef`; `useEffect`; DOM
+synchronization; immutable props; component state transitions; async UI;
+optimistic updates versus refresh; accessible form labels.
 
 ### Interview questions
 
@@ -593,6 +595,8 @@ transitions; async UI; optimistic updates versus refresh; accessible form labels
    worth the extra rollback and stale-response complexity.
 3. **How can you model edit/cancel/save UI clearly?** — Use explicit state for
    the active task and draft, and define the transitions for each action.
+4. **Why use an effect for focus but not filtered tasks?** — Focus synchronizes
+   with the DOM after rendering; filtered tasks can be derived during render.
 
 ---
 
@@ -694,19 +698,23 @@ versus real dependencies; deterministic tests; regression testing; type checking
   - Create root `auth.ts` and the `app/api/auth/[...nextauth]/route.ts` handler.
   - Add sign-in and sign-out controls and a clear unauthenticated state.
   - Verify session state is available only through the supported server/client interfaces.
-- [ ] **3. Protect app entry points**
+- [ ] **3. Share client-visible session state deliberately**
+  - Wrap only the interactive subtree that needs it with `SessionProvider`.
+  - Read it with `useSession()` instead of prop drilling through Client Components.
+  - Keep `auth()` checks in every protected Server Component and Route Handler.
+- [ ] **4. Protect app entry points**
   - Require a valid session before rendering private task data.
   - Redirect or show a sign-in screen for anonymous visitors.
   - Do not treat hiding a button or UI as authorization.
-- [ ] **4. Verify session behavior**
+- [ ] **5. Verify session behavior**
   - Test sign-in, sign-out, expired/missing session, and direct navigation to task routes.
   - Do not log tokens, cookies, or provider secrets.
 
 ### Concepts to know
 
 Authentication versus authorization; identity provider; session lifecycle;
-server-side session checks; cookies; secret management; redirect flows; trust
-boundaries.
+React Context; `SessionProvider`; server-side session checks; cookies; secret
+management; redirect flows; trust boundaries.
 
 ### Interview questions
 
@@ -719,6 +727,8 @@ boundaries.
 3. **Why is hiding a page link not access control?** — A user can call an API
    directly; authorization must be enforced on the server for every protected
    operation.
+4. **What can authentication Context do?** — It can distribute session state
+   to Client Components, but it cannot protect server APIs or authorize data.
 
 ---
 
@@ -825,14 +835,19 @@ reader, and narrow-screen layouts.
 - [ ] **3. Check responsive behavior**
   - Test narrow mobile and desktop widths.
   - Avoid horizontal overflow and ensure task actions remain usable.
-- [ ] **4. Verify**
+- [ ] **4. Practice React Context and measured memoization**
+  - Review Auth.js `SessionProvider` as the app's practical Context example.
+  - Use `useMemo`, `useCallback`, and `React.memo` in a small profiling lab.
+  - Keep the optimization only if the React Profiler shows useful avoided work.
+- [ ] **5. Verify**
   - Navigate the full task flow with keyboard only.
   - Inspect with browser accessibility tools and fix concrete findings.
 
 ### Concepts to know
 
 Semantic HTML; accessible names; keyboard interaction; focus management;
-responsive layout; status announcements; contrast; progressive enhancement.
+responsive layout; status announcements; contrast; progressive enhancement;
+Context; `useMemo`; `useCallback`; `React.memo`; profiling.
 
 ### Interview questions
 
@@ -843,6 +858,9 @@ responsive layout; status announcements; contrast; progressive enhancement.
 3. **What does responsive design require beyond shrinking the page?** —
    Controls and content need to remain usable and understandable at different
    viewport sizes.
+4. **How do the memoization APIs differ?** — `useMemo` caches a value,
+   `useCallback` caches a function reference, and `React.memo` may skip a
+   component render when props are shallowly equal.
 
 ---
 

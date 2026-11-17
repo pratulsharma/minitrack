@@ -73,7 +73,8 @@ sessions/cookies, secret management, and protecting API endpoints.
 | Automated testing | Verify routes, database integration, UI flow, and access rules | Days 9 and 12 |
 | Sign in | Authenticate with a maintained provider | Day 10 |
 | Per-user task ownership | Show each person only their own tasks | App Days 11–12 |
-| Responsive and accessible UI | Use the tracker across screen sizes and input modes | App Day 13 |
+| React hooks and optimization | Practice refs, effects, auth Context, and measured memoization | Days 7, 10, and 13 |
+| Responsive and accessible UI | Use the tracker across screen sizes and input modes | Day 13 |
 | Deploy | Run the application with production services | App Days 14–15 |
 | Handle conflicting edits | Avoid silently overwriting changes | Optional advanced module |
 
