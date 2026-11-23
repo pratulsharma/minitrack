@@ -60,14 +60,19 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
     setBusy(true);
     try {
       const res = await fetch(path, options);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        setError(`Request failed (${res.status})`);
+        setBusy(false);
+        return false;
+      }
+
       router.refresh(); // Ask Next to re-run the Server Component to get fresh DB data.
+      setBusy(false);
       return true;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Request failed');
+    } catch {
+      setError('Could not connect to the server');
+      setBusy(false);
       return false;
-    } finally {
-      setBusy(false); // Runs whether request succeeds or fails.
     }
   }
 

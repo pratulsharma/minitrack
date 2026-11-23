@@ -223,42 +223,101 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from './types';
 
+type Filter = 'all' | 'open' | 'done';
+
 // Client Component: form events and React state need browser interactivity.
 export default function TaskBoard({ tasks }: { tasks: Task[] }) {
   const [title, setTitle] = useState(''); // Controlled input: React owns the value.
-  const [filter, setFilter] = useState<'all' | 'open' | 'done'>('all');
+  const [filter, setFilter] = useState<Filter>('all');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
 
-  // Derived state: filtering the props doesn't need another useState or useEffect.
-  const visible = tasks.filter(task => filter === 'all' || (filter === 'done' ? task.done : !task.done));
-
-  async function request(path: string, options: RequestInit) {
-    setError('');
-    setBusy(true);
-    try {
-      const res = await fetch(path, options);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      router.refresh(); // Ask Next to re-run the Server Component to get fresh DB data.
-      return true;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Request failed');
-      return false;
-    } finally {
-      setBusy(false); // Runs whether request succeeds or fails.
-    }
+  // Start with every task, then replace the list only when a filter is active.
+  let visibleTasks = tasks;
+  if (filter === 'open') {
+    visibleTasks = tasks.filter(task => !task.done);
+  }
+  if (filter === 'done') {
+    visibleTasks = tasks.filter(task => task.done);
   }
 
   async function addTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); // Prevent browser's default full-page form submission.
-    const normalized = title.trim();
-    if (!normalized) return;
-    const ok = await request('/api/tasks', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: normalized }),
-    });
-    if (ok) setTitle('');
+    const cleanTitle = title.trim();
+    if (!cleanTitle) return;
+
+    setBusy(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: cleanTitle }),
+      });
+
+      if (!response.ok) {
+        setError(`Could not add task (${response.status})`);
+        setBusy(false);
+        return;
+      }
+
+      setTitle('');
+      router.refresh(); // Load the latest tasks from PostgreSQL.
+      setBusy(false);
+    } catch {
+      setError('Could not connect to the server');
+      setBusy(false);
+    }
+  }
+
+  async function toggleTask(taskId: string, done: boolean) {
+    setBusy(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ done }),
+      });
+
+      if (!response.ok) {
+        setError(`Could not update task (${response.status})`);
+        setBusy(false);
+        return;
+      }
+
+      router.refresh();
+      setBusy(false);
+    } catch {
+      setError('Could not connect to the server');
+      setBusy(false);
+    }
+  }
+
+  async function deleteTask(taskId: string) {
+    setBusy(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        setError(`Could not delete task (${response.status})`);
+        setBusy(false);
+        return;
+      }
+
+      router.refresh();
+      setBusy(false);
+    } catch {
+      setError('Could not connect to the server');
+      setBusy(false);
+    }
   }
 
   return (
@@ -288,7 +347,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         <select
           className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
           value={filter}
-          onChange={event => setFilter(event.target.value as 'all' | 'open' | 'done')}
+          onChange={event => setFilter(event.target.value as Filter)}
         >
           <option value="all">All</option>
           <option value="open">Open</option>
@@ -305,11 +364,11 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         </p>
       )}
 
-      {visible.length === 0 ? (
+      {visibleTasks.length === 0 ? (
         <p className="mt-6 text-slate-400">No tasks in this filter.</p>
       ) : (
         <ul className="mt-6 border-t border-slate-700">
-          {visible.map(task => (
+          {visibleTasks.map(task => (
             <li
               className="flex items-center gap-3 border-b border-slate-700 py-4"
               key={task.id}
@@ -321,11 +380,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                 checked={task.done}
                 disabled={busy}
                 onChange={event => {
-                  void request(`/api/tasks/${task.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ done: event.target.checked }),
-                  });
+                  void toggleTask(task.id, event.target.checked);
                 }}
               />
               <span
@@ -340,7 +395,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                 disabled={busy}
                 type="button"
                 onClick={() => {
-                  void request(`/api/tasks/${task.id}`, { method: 'DELETE' });
+                  void deleteTask(task.id);
                 }}
               >
                 Delete
@@ -359,9 +414,13 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
 - `'use client'` enables hooks and event handlers in this component.
 - The input is **controlled**: `value` comes from React state and `onChange` updates it.
-- We **derive** the visible list from `tasks` and `filter`. No extra `useEffect` or duplicate task state.
+- We **derive** `visibleTasks` with simple `if` statements. No extra
+  `useState` or `useEffect` is needed.
+- Each user action has its own named function. This repeats a little request
+  setup, but makes the first React version easier to trace and debug.
 - `busy` disables interactions while the request is in flight. This reduces duplicates but is **not** server-side idempotency.
-- `finally` clears busy even after an error; `router.refresh()` re-fetches server data.
+- Every success and error path sets `busy` back to `false`.
+- `router.refresh()` re-fetches the latest task data from the server.
 - Tailwind responsive prefixes such as `sm:` apply a utility only at that breakpoint and above.
 - Conditional class strings make completed and active task states visually different.
 

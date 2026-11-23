@@ -1,5 +1,5 @@
-import { createTask, listTasks } from '../../lib/tasks';
-import { isRecord, normalizeTitle } from '../../lib/validation';
+import { createTask, listTasks, setDone, deleteTask } from '../../lib/tasks';
+import { isRecord, normalizeTitle, isValidId } from '../../lib/validation';
 
 // Next.js maps this named export to GET /api/tasks.
 export async function GET(): Promise<Response> {

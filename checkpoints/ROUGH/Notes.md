@@ -189,5 +189,25 @@ Interview-ready answer: A key identifies an item among its siblings so React can
 - Important nuance: key is used internally by React and is not passed to the component as a normal prop. Pass task.id separately if the child component needs the ID.
 
 > day-05
-- Now we will add PATCH (update) and DELETE to the route handlee
-- PATCH is update --> I think we use 
+- Now we will add PATCH (update) and DELETE to the route handle
+- PATCH is update ; note that for the update/patch we need primary key (id)
+- so the pattern is 'Update <tablename> SET <attributename> = $1 WHERE <primarykey> = $2 RETURNING id, title,done,created_at',[attributename,primarykey]
+- so first we will use the function - tasks.ts (thats the one in the /lib) and then call it in the route handler
+- for deleting we use 'DELETE FROM tasks WHERE id=$1 RETURNING id', [id]
+- now we will update the route handler in /api/tasks/[id]/route.ts --> note that its inside [id] directory
+- one important thing to note is that when we are updating/patching or deleting a record/task we need to send the id in th path; so we need to capture the if from the path in route handler
+- we get it from the RouteContext -> Note that we need to define the type of RouteContext 
+> type RouteContext = { params: Promise<{id: string}> }
+
+- for route handler i noticed that all awaits are inside try/catch --> may be due to different type of failures need different type of error response. 
+- Note that in delete route handler we want to use {id} in the catch block so de define it before (or outside the try block)
+- Now we want to work on the form --> a real client side page in which the user will add a new task and add it in the db
+
+- 
+- what is the update pattern --> we need primary key so that we know which row to update?
+- we also need to know which attribute to update --> for that we use set blah blah
+- Update tablename set fname $1 where primarykey $2 Returning id,
+- what do need in the delete? we also need primary key in the delete --> 
+- note that for the delete and update we need id; the path will have the id ../tasks/id/
+- the FE we create the dir structure --> tasks/[id]/route.ts 
+- type RouteContext = {params: Promise<id: string>}
