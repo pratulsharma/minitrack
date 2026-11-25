@@ -1098,7 +1098,7 @@ sequenceDiagram
   participant P as PostgreSQL
   K->>B: Tab to "Edit Buy milk" and press Enter
   B->>R: onClick → startEditing(task 42)
-  R-->>B: Render edit input; effect focuses and selects it
+  R-->>B: Render edit input, effect focuses and selects it
   K->>B: Type "Buy oat milk", press Enter
   B->>R: onSubmit → saveTask()
   R-->>B: readOnly input, status "Saving…"
@@ -1113,7 +1113,7 @@ sequenceDiagram
   else row missing or not owned
     P-->>A: zero rows
     A-->>R: 404 {"error":"Task not found"}
-    R-->>B: role="alert" message under input; focus stays in input
+    R-->>B: role="alert" message under input, focus stays in input
   end
   B-->>K: Screen reader announces the result
 ```

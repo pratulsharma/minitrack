@@ -94,7 +94,8 @@ Do not use an effect to calculate values that can be derived during rendering.
 
 ## 4. Submit the draft
 
-Reuse the Day 5 request helper:
+Follow the same request pattern as the Day 5 `toggleTask` and `deleteTask`
+handlers, using the existing `busy`, `error`, and `router` values:
 
 ```ts
 async function saveTask(event: React.FormEvent<HTMLFormElement>) {
@@ -107,16 +108,28 @@ async function saveTask(event: React.FormEvent<HTMLFormElement>) {
     return;
   }
 
-  const ok = await request(`/api/tasks/${editingId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: normalized }),
-  });
+  setBusy(true);
+  setError('');
+  try {
+    const response = await fetch(`/api/tasks/${editingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: normalized }),
+    });
 
-  if (ok) {
-    // router.refresh() inside request reloads the PostgreSQL-backed props.
+    if (!response.ok) {
+      // Keep the draft open so the user can correct it or retry.
+      setError(`Could not save task (${response.status})`);
+      return;
+    }
+
     setEditingId(null);
     setEditTitle('');
+    router.refresh(); // Reload the PostgreSQL-backed props.
+  } catch {
+    setError('Could not connect to the server');
+  } finally {
+    setBusy(false);
   }
 }
 ```
@@ -126,12 +139,12 @@ must not become a second writable database.
 
 ## 5. Render viewing or editing mode
 
-Inside `visible.map`, replace only the title/action portion:
+Inside `visibleTasks.map`, replace only the title/action portion:
 
 ```tsx
 {editingId === task.id ? (
   <form
-    className="col-span-2 flex min-w-0 items-center gap-2"
+    className="flex min-w-0 flex-1 items-center gap-2"
     onSubmit={saveTask}
   >
     <label className="sr-only" htmlFor={`edit-${task.id}`}>

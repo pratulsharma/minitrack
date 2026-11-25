@@ -98,10 +98,13 @@ match the reference test:
 ```python
 a = ListNode(1, ListNode(2, ListNode(3)))  # 1 -> 2 -> 3
 b = ListNode(1, ListNode(4))               # 1 -> 4
-solve(a, b)       # 1 -> 1 -> 2 -> 3 -> 4
-solve(None, b)    # 1 -> 4 (the other list unchanged)
-solve(None, None) # None
+solve(a, b)                           # 1 -> 1 -> 2 -> 3 -> 4
+solve(None, ListNode(1, ListNode(4)))  # 1 -> 4 (the non-empty list as is)
+solve(None, None)                     # None
 ```
+
+Use a fresh list in the second call: after `solve(a, b)`, the original nodes
+of `a` and `b` have been relinked into the merged list.
 
 The simple approach copies all values into a Python list, sorts it, and builds
 new nodes: O((n + m) log(n + m)) time and O(n + m) extra space. Because both
@@ -131,8 +134,8 @@ Two ideas make the code short:
 flowchart TD
   Start["dummy = tail = ListNode()"] --> Both{"a and b both not None?"}
   Both -- Yes --> Compare{"a.val <= b.val?"}
-  Compare -- Yes --> TakeA["tail.next = a; a = a.next"]
-  Compare -- No --> TakeB["tail.next = b; b = b.next"]
+  Compare -- Yes --> TakeA["tail.next = a, then a = a.next"]
+  Compare -- No --> TakeB["tail.next = b, then b = b.next"]
   TakeA --> Advance["tail = tail.next"]
   TakeB --> Advance
   Advance --> Both
@@ -203,7 +206,7 @@ if __name__ == '__main__':
     assert to_list(solve(build([1, 2]), build([3, 4]))) == [1, 2, 3, 4]  # no overlap
     first, second = ListNode(2), ListNode(2)
     merged = solve(first, second)
-    assert merged is first and merged.next is second             # ties take a first
+    assert merged is first and merged.next is second             # nodes reused; ties take a first
     print('All checks passed')
 ```
 

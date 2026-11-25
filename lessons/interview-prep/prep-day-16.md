@@ -388,19 +388,20 @@ flowchart LR
 ```
 
 Review these key excerpts (they are already in your project; do not retype
-them). First, the **Server Component** in `frontend/app/page.tsx` reads the
-session, the URL, and PostgreSQL on the server:
+them, and `// ...` marks lines left out). First, the **Server Component** in
+`frontend/app/page.tsx` reads the session, the URL, and PostgreSQL on the
+server:
 
 ```tsx
 async function TaskContent({ searchParams }: PageProps) {
   const session = await auth();
   if (!session?.user?.id) {
-    return /* "Sign in to open MiniTrack" section */;
+    // ...return the "Sign in to open MiniTrack" section
   }
 
   const params = await searchParams;
   const filters = normalizeTaskFilters(params.q, params.status);
-  // ...try/catch around searchTasks; a failure renders a role="alert" message
+  // ...a try/catch around this call renders a role="alert" message on failure
   const tasks = await searchTasks(session.user.id, filters);
 
   return (
@@ -724,8 +725,8 @@ Score each answer: **2** = correct, concrete, and includes an example;
     keyboard behavior to a `<div>`.
 14. **`useMemo`, `useCallback`, `memo`?** `useMemo` caches a value,
     `useCallback` caches a function's identity, and `memo` skips a child render
-    when its props are shallowly equal. Profile first; on Prep Day 15 they
-    added code without a meaningful win for 200 rows.
+    when its props are shallowly equal. Profile first; on Prep Day 15 you
+    measured `memo(TaskRow)` before deciding whether to keep it.
 15. **Why a connection pool?** Opening a PostgreSQL connection is slow, so
     `getPool()` reuses a limited set of connections. If every connection is
     busy, new queries wait, so slow queries and leaked clients show up as
@@ -798,8 +799,9 @@ Trace one concrete input. Name every boundary, value, and possible failure.
 **Break it:** Treat a successful production build as proof that authorization works.
 
 To see it, temporarily remove `AND owner_id = $3` from the rename `UPDATE` in
-`frontend/lib/tasks.ts` (keep the `$3` value in the array or TypeScript will
-still compile), then run `npm run build` and `npm run test:integration`.
+`frontend/lib/tasks.ts` **and** remove `ownerId` from that query's values array
+(PostgreSQL rejects a query that receives more values than placeholders). Then
+run `npm run build` and `npm run test:integration`.
 
 **Predict before running:** write the expected symptom in your notebook.
 
@@ -810,7 +812,8 @@ still compile), then run `npm run build` and `npm run test:integration`.
 **Root cause:** Compilation and behavior verification answer different questions.
 
 **Restore and verify:** Run the negative authorization tests as a separate required gate.
-Restore `AND owner_id = $3`, and confirm `npm run test:integration` passes again.
+Restore `AND owner_id = $3` and the `ownerId` value, and confirm
+`npm run test:integration` passes again.
 
 Do not stop after making the symptom disappear. Explain why the repair restores
 the intended invariant.

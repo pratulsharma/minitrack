@@ -211,14 +211,31 @@ authorization.
 
 ## 5. Protect the page
 
-Wrap request-time authentication inside Suspense:
+Wrap request-time authentication inside Suspense. Replace
+`frontend/app/page.tsx` with this version, which keeps the Day 8 URL search and
+the database error message, and adds the session check before any task read
+(the summary component above is `frontend/app/ClientSessionSummary.tsx`):
 
 ```tsx
 import { Suspense } from 'react';
 import { auth } from '@/auth';
 import AuthControls from './AuthControls';
+import AuthSessionProvider from './AuthSessionProvider';
+import ClientSessionSummary from './ClientSessionSummary';
+import SearchForm from './SearchForm';
+import TaskBoard from './TaskBoard';
+import { searchTasks } from '../lib/tasks';
+import { normalizeTaskFilters } from '../lib/validation';
+import type { Task } from './types';
 
-async function PrivateTasks() {
+type PageProps = {
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+  }>;
+};
+
+async function PrivateTasks({ searchParams }: PageProps) {
   // auth() reads the signed session cookie on the server.
   const session = await auth();
 
@@ -233,20 +250,57 @@ async function PrivateTasks() {
     );
   }
 
+  // Only a signed-in request reaches the database read.
+  const params = await searchParams;
+  const filters = normalizeTaskFilters(params.q, params.status);
+
+  let tasks: Task[] = [];
+  let error: string | null = null;
+  try {
+    tasks = await searchTasks(filters);
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Unable to load tasks';
+  }
+
   return (
     <>
-      <AuthControls />
-      {/* Render the existing request-time task content here. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Context wraps only the interactive subtree that needs it. */}
+        <AuthSessionProvider session={session}>
+          <ClientSessionSummary />
+        </AuthSessionProvider>
+        <AuthControls />
+      </div>
+      <SearchForm filters={filters} />
+      {error ? (
+        <p
+          className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200"
+          role="alert"
+        >
+          Could not load tasks: {error}. Check PostgreSQL and DATABASE_URL.
+        </p>
+      ) : (
+        <TaskBoard tasks={tasks} />
+      )}
     </>
   );
 }
 
-export default function Home() {
+export default function Home({ searchParams }: PageProps) {
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
-      <h1 className="mb-8 text-4xl font-bold">MiniTrack</h1>
-      <Suspense fallback={<p>Checking session...</p>}>
-        <PrivateTasks />
+      <header className="mb-8">
+        <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">
+          Your workspace
+        </p>
+        <h1 className="mt-3 text-4xl font-bold tracking-tight">MiniTrack</h1>
+        <p className="mt-2 text-slate-400">
+          Simple tasks. Serious full-stack concepts.
+        </p>
+      </header>
+
+      <Suspense fallback={<p className="text-slate-400">Checking session...</p>}>
+        <PrivateTasks searchParams={searchParams} />
       </Suspense>
     </main>
   );
@@ -324,6 +378,52 @@ Test in a private/incognito window:
 
 Plain curl does not automatically share the browser cookie. That makes it
 useful for checking anonymous behavior.
+
+### Update the Day 9 browser test
+
+The Day 9 Playwright test opens `/` without signing in, so it now sees the
+sign-in screen. Real GitHub sign-in should not run inside automated tests, so
+park that test in `frontend/test/e2e/tasks.spec.ts` until a test-only sign-in
+seam exists:
+
+```ts
+// Parked until the browser test can sign in; anonymous users now see sign-in.
+test.fixme('creates, completes, and persists a task', async ({ page }) => {
+```
+
+Then create `frontend/test/e2e/auth.spec.ts` to prove the new signed-out
+behavior:
+
+```ts
+import { expect, test } from '@playwright/test';
+
+test('anonymous visitors see sign-in and the API returns 401', async ({ page, request }) => {
+  await page.goto('/');
+
+  await expect(
+    page.getByRole('heading', { name: 'Sign in to open MiniTrack' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign in with GitHub' })).toBeVisible();
+  // No task form is rendered for an anonymous visitor.
+  await expect(page.getByLabel('Task title')).toHaveCount(0);
+
+  // `request` sends HTTP without the browser's cookies.
+  const response = await request.get('/api/tasks');
+  expect(response.status()).toBe(401);
+});
+```
+
+Run the checks from `frontend/`:
+
+```bash
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+npm run build
+```
+
+If `auth.spec.ts` fails with `MissingSecret`, the dev server cannot read
+`AUTH_SECRET`; confirm it is in `frontend/.env.local`.
 
 ## Debugging exercise
 
@@ -425,6 +525,8 @@ redirects. Security correctness matters more than micro-optimizing this path.
 - [ ] Anonymous page access shows sign-in.
 - [ ] Every task API method rejects anonymous requests.
 - [ ] I can explain why task ownership is still missing.
-- [ ] Tests, TypeScript, and production build pass.
+- [ ] Unit and integration tests pass; the anonymous browser test passes and
+      the parked task test is marked `test.fixme`.
+- [ ] TypeScript and the production build pass.
 
 **Suggested commit:** `app-day10: add Auth.js GitHub sign-in`

@@ -35,12 +35,16 @@ From `frontend/`:
 
 ```bash
 npm install --save-dev tsx @playwright/test dotenv-cli
+npm install server-only
 npx playwright install chromium
 ```
 
 - `tsx` runs TypeScript tests with Node's built-in test runner.
 - Playwright controls a real browser.
 - `dotenv-cli` loads a dedicated test environment file for spawned processes.
+- `server-only` provides the `import 'server-only'` marker used by
+  `frontend/lib/db.ts`. Next.js understands it automatically; plain Node needs
+  the package installed.
 
 Add scripts:
 
@@ -49,11 +53,15 @@ Add scripts:
   "scripts": {
     "test": "npm run test:unit",
     "test:unit": "tsx --test test/unit/*.test.ts",
-    "test:integration": "dotenv -e .env.test.local -- tsx --test test/integration/*.test.ts",
+    "test:integration": "dotenv -e .env.test.local -- tsx --conditions=react-server --test test/integration/*.test.ts",
     "test:e2e": "dotenv -e .env.test.local -- playwright test"
   }
 }
 ```
+
+**Why `--conditions=react-server`?** Outside Next.js, `server-only` throws on
+purpose to stop accidental client imports. This flag tells Node to load its
+empty server version, so integration tests can import the real data layer.
 
 ## 3. Create an isolated database
 

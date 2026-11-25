@@ -7,10 +7,11 @@ It assumes MiniTrack App Days 1–4 are complete and begins with the canonical
 
 These preparation lessons combine notebook recall, frontend, backend,
 MiniTrack integration, debugging, interview Q&A, complexity, and verification
-into seven-hour guided days. [Prep Day 01](prep-day-01.md) also contains its
-DSA problem, reference solution, and add-task code in one reading file; write
-and run the exercises in the separate practice and application files. The
-remaining prep days still link to the detailed app and DSA lessons.
+into seven-hour guided days. Every prep day is one self-contained reading
+file: its DSA problem, brute-force and optimized code, DSA interview Q&A, and
+the day's app code are all inside it. Write and run the exercises in the
+separate practice and application files. The original app and DSA lessons
+remain linked from each day for comparison.
 
 ## Daily track
 

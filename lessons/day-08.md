@@ -132,6 +132,7 @@ import SearchForm from './SearchForm';
 import TaskBoard from './TaskBoard';
 import { searchTasks } from '../lib/tasks';
 import { normalizeTaskFilters } from '../lib/validation';
+import type { Task } from './types';
 
 type PageProps = {
   searchParams: Promise<{
@@ -144,12 +145,28 @@ async function TaskResults({ searchParams }: PageProps) {
   // Awaiting searchParams makes this subtree request-specific.
   const params = await searchParams;
   const filters = normalizeTaskFilters(params.q, params.status);
-  const tasks = await searchTasks(filters);
+
+  let tasks: Task[] = [];
+  let error: string | null = null;
+  try {
+    tasks = await searchTasks(filters);
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Unable to load tasks';
+  }
 
   return (
     <>
       <SearchForm filters={filters} />
-      <TaskBoard tasks={tasks} />
+      {error ? (
+        <p
+          className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200"
+          role="alert"
+        >
+          Could not load tasks: {error}. Check PostgreSQL and DATABASE_URL.
+        </p>
+      ) : (
+        <TaskBoard tasks={tasks} />
+      )}
     </>
   );
 }
@@ -157,7 +174,15 @@ async function TaskResults({ searchParams }: PageProps) {
 export default function Home({ searchParams }: PageProps) {
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
-      <h1 className="text-4xl font-bold">MiniTrack</h1>
+      <header className="mb-8">
+        <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">
+          Your workspace
+        </p>
+        <h1 className="mt-3 text-4xl font-bold tracking-tight">MiniTrack</h1>
+        <p className="mt-2 text-slate-400">
+          Simple tasks. Serious full-stack concepts.
+        </p>
+      </header>
 
       <Suspense fallback={<p className="mt-8 text-slate-400">Filtering tasks...</p>}>
         <TaskResults searchParams={searchParams} />
@@ -168,7 +193,29 @@ export default function Home({ searchParams }: PageProps) {
 ```
 
 You do not need `io()` inside `TaskResults`: `searchParams` is already a
-request-time API and creates the suspension point.
+request-time API and creates the suspension point. The header and database
+error message are the same as Day 5; only the data source changed.
+
+### Remove the Day 5 client-side filter
+
+PostgreSQL now applies the status filter, so the **Show** dropdown in
+`frontend/app/TaskBoard.tsx` would be a second, disconnected filter. In
+`TaskBoard.tsx`:
+
+1. Delete `type Filter = 'all' | 'open' | 'done';`.
+2. Delete the `filter` state: `const [filter, setFilter] = useState<Filter>('all');`.
+3. Replace the `let visibleTasks = tasks;` block and its two `if` statements
+   with one line:
+
+   ```ts
+   const visibleTasks = tasks; // The server already applied the URL filters.
+   ```
+
+4. Delete the `<label>` that contains the **Show:** `<select>`.
+5. Change the empty message to `No tasks match these filters.`
+
+Keeping the name `visibleTasks` means the existing `visibleTasks.map(...)`
+rendering code stays unchanged.
 
 ## 5. Build a no-JavaScript search form first
 
@@ -235,7 +282,9 @@ export async function GET(request: NextRequest): Promise<Response> {
   );
 
   try {
-    return Response.json(await searchTasks(filters));
+    return Response.json(await searchTasks(filters), {
+      headers: { 'Cache-Control': 'no-store' },
+    });
   } catch (error: unknown) {
     console.error('GET /api/tasks failed:', error);
     return Response.json(
