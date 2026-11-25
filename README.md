@@ -38,6 +38,17 @@ sessions so each server, browser, and verification step can be learned
 separately.
 **Rule:** attempt each lesson's exercise before viewing reference code.
 
+Preparing for full-stack interviews before December 24, 2026? Follow the
+[25-day full-stack interview preparation plan](docs/FULL_STACK_INTERVIEW_PREP_PLAN.md)
+for a balanced frontend, backend, Python DSA, system-design, and mock-interview
+schedule that includes notebook recall and catch-up time. Start its complete
+daily lessons at
+[Interview Prep Day 01](lessons/interview-prep/prep-day-01.md); the combined
+track assumes App Days 1–4 are already complete and begins with App Day 5.
+For one continuous document containing the study system, references, and all
+25 lessons, use the
+[complete interview preparation master guide](docs/INTERVIEW_CHEATSHEET.md).
+
 ## Start here: lessons contain all the code and diagrams
 
 **Read in order:** [Day 1](lessons/day-01.md) →

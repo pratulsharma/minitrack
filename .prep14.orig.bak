@@ -1,0 +1,247 @@
+# Prep Day 14 — Make the complete flow accessible
+
+**Date:** Thursday, December 10, 2026  
+**Time:** 7 study hours plus breaks  
+**Starting point:** App Days 1–4 are complete. Continue from the current learner workspace and the previous preparation-day exit checklist.  
+**Goal:** Make the complete flow accessible.
+
+[Prep Day 13](prep-day-13.md) · [Preparation plan](../../docs/FULL_STACK_INTERVIEW_PREP_PLAN.md) · [Track home](README.md) · [Prep Day 15](prep-day-15.md)
+
+**Canonical study material:** [App Day 13](../day-13.md) · [DSA Day 14](../../dsa-python/lessons/dsa-day-14.md)
+
+## Learning objectives
+
+- explain semantic html and deliberate focus in beginner-friendly language;
+- explain accessible validation responses and its failure boundary;
+- implement or verify the listed MiniTrack milestone;
+- solve DSA Day 14 using the fast and slow pointers pattern;
+- record the result in your rough notebook and explain it without reading.
+
+## 1. Start with notebook recall (45 minutes)
+
+Before opening a lesson, write answers in
+[`checkpoints/ROUGH/Notes.md`](../../checkpoints/ROUGH/Notes.md):
+
+1. What did yesterday's browser action send to the server?
+2. Where is persistent task data stored, and what state is only temporary?
+3. What error or edge case can you already predict for today's topic?
+4. What do you remember about the **fast and slow pointers** pattern?
+
+Use this format:
+
+```md
+## Thursday, December 10, 2026
+
+- What:
+- Why:
+- How MiniTrack uses it:
+- What can go wrong:
+- First task:
+```
+
+Do not copy the source paragraph. Write what you remember, then compare.
+
+## 2. Understand today's full-stack boundary (20 minutes)
+
+**Frontend focus — Semantic HTML and deliberate focus:** Native controls provide keyboard behavior, roles, and states automatically. Use ARIA to add missing meaning, not to recreate a button from a generic element.
+
+**Backend focus — Accessible validation responses:** The server should return stable, non-secret error information that the client can associate with the affected control and announce appropriately.
+
+**Today's connection:** Accessible behavior spans browser semantics, React state, async feedback, and predictable server errors.
+
+```mermaid
+flowchart LR
+  Recall["Recall from notebook"] --> DSA["DSA 14: fast and slow pointers"]
+  DSA --> FE["Frontend: Semantic HTML and deliberate focus"]
+  FE --> BE["Backend: Accessible validation responses"]
+  BE --> App["MiniTrack: Make the complete flow accessible"]
+  App --> Explain["Explain, test, and record gaps"]
+```
+
+## 3. Python DSA practice (1 hour 45 minutes)
+
+**Problem and reference:** [DSA Day 14](../../dsa-python/lessons/dsa-day-14.md)  
+**Practice file:** [`dsa-python/practice/day-14.py`](../../dsa-python/practice/day-14.py)  
+**Pattern:** fast and slow pointers
+
+### Invariant to say aloud
+
+Advance one pointer twice as fast; if a cycle exists, the pointers eventually meet.
+
+### Work in this order
+
+1. Restate the problem and ask about constraints.
+2. Give a brute-force approach and its cost before optimizing.
+3. Write the invariant above in your own words.
+4. Implement without opening the solution for 25 minutes.
+5. Test empty, smallest, typical, duplicate, and boundary cases where relevant.
+6. Use a small hint if blocked; do not spend the entire block stuck.
+7. Compare with the commented reference and re-code the key loop from memory.
+
+From the repository root:
+
+```bash
+python3 dsa-python/scripts/check_practice.py 14
+python3 -m unittest discover -s dsa-python/tests -v
+```
+
+**Expected observation:** the day-specific checker accepts your implementation,
+and the completed reference suite still passes.
+
+## 4. Frontend guided study (1 hour 30 minutes)
+
+### What
+
+Native controls provide keyboard behavior, roles, and states automatically. Use ARIA to add missing meaning, not to recreate a button from a generic element.
+
+### Why
+
+The browser layer should make state and feedback understandable without taking
+ownership of persistent data or security decisions that belong on the server.
+
+### How
+
+Read the relevant canonical app lesson linked above. Before revealing its full
+code, sketch the component state, user event, request, success result, and
+failure result.
+
+Files to open deliberately:
+
+- `frontend/app/TaskBoard.tsx`
+- `frontend/app/page.tsx`
+
+Answer before coding:
+
+- Which value is persistent, and which value is temporary interaction state?
+- What starts this behavior?
+- What should the user see while work is pending?
+- What should remain unchanged when the operation fails?
+
+## 5. Backend guided study (1 hour 30 minutes)
+
+### What
+
+The server should return stable, non-secret error information that the client can associate with the affected control and announce appropriately.
+
+### Boundary checklist
+
+- Validate untrusted path, query, and body values.
+- Authenticate identity when the route is protected.
+- Authorize the resource separately from authentication.
+- Bind SQL values rather than concatenating untrusted data.
+- Return an explicit success or error status.
+- Log internal failures on the server without exposing secrets.
+
+Use the canonical app lesson for complete implementation code. Type the new
+code yourself in the learner workspace; do not copy from
+`reference/frontend-complete/` before attempting it.
+
+## 6. MiniTrack implementation (1 hour)
+
+**Milestone source:** Day 13 semantics, keyboard behavior, names, states, and focus
+
+1. Complete create, edit, filter, and delete using only the keyboard.
+2. Verify every control has an accessible name and visible focus.
+3. Associate errors with fields and announce important async failures.
+
+Run the smallest checks that cover today's change. Use the exact commands from
+the canonical lesson or the relevant package scripts.
+
+**Expected observation:** the user-visible milestone works, its important
+failure path is explicit, and existing behavior remains intact.
+
+## 7. Trace the event or request
+
+```mermaid
+sequenceDiagram
+  participant U as You
+  participant B as Browser or interviewer
+  participant A as Application boundary
+  participant D as Data or algorithm state
+  U->>B: Start the day's action
+  B->>A: Send event, request, or explanation
+  A->>A: Validate assumptions and inputs
+  A->>D: Perform bounded operation
+  D-->>A: Return result or failure
+  A-->>B: Observable outcome
+  B-->>U: Verify and explain without notes
+```
+
+Trace one concrete input. Name every boundary, value, and possible failure.
+
+## 8. Deliberate debugging exercise (25 minutes)
+
+**Break it:** Replace a button with a div that has only an onClick handler.
+
+**Predict before running:** write the expected symptom in your notebook.
+
+**Expected symptom:** Keyboard activation and button semantics disappear.
+
+**Root cause:** A visual shape was used instead of the correct interactive element.
+
+**Restore and verify:** Restore a native button and style it as needed.
+
+Do not stop after making the symptom disappear. Explain why the repair restores
+the intended invariant.
+
+## 9. Interview questions and answers (30 minutes)
+
+### Q1. What is semantic html and deliberate focus?
+
+**Interview-ready answer:** Native controls provide keyboard behavior, roles, and states automatically. Use ARIA to add missing meaning, not to recreate a button from a generic element.
+
+**Example:** Use `frontend/app/TaskBoard.tsx` and point to the state, event, or rendered
+behavior involved in today's milestone.
+
+**Senior follow-up:** Explain when this frontend choice would become difficult
+to maintain and what measurement or requirement would justify a different
+design.
+
+### Q2. How should the backend handle accessible validation responses?
+
+**Interview-ready answer:** The server should return stable, non-secret error information that the client can associate with the affected control and announce appropriately.
+
+**Example:** Trace the relevant Route Handler or server boundary into the
+MiniTrack data function and back to its response.
+
+**Senior follow-up:** Describe the failure mode, logging requirement, and what
+must remain private when the dependency is unavailable.
+
+### Q3. What invariant makes the fast and slow pointers solution correct?
+
+**Interview-ready answer:** Advance one pointer twice as fast; if a cycle exists, the pointers eventually meet.
+
+**Example:** Dry-run the first non-trivial sample from DSA Day 14 and
+show the state after each iteration.
+
+**Senior follow-up:** State the assumptions under which the claimed complexity
+holds and how changed constraints might require another approach.
+
+### Q4. How does today's work fit the complete MiniTrack system?
+
+**Interview-ready answer:** Accessible behavior spans browser semantics, React state, async feedback, and predictable server errors.
+
+**Example:** Begin with one user action and finish with the visible result or
+verified system state.
+
+**Senior follow-up:** Identify the first bottleneck, security risk, or
+operational signal you would measure before adding infrastructure.
+
+## 10. Complexity and operational cost
+
+- **DSA:** O(n) time and O(1) space.
+- **Application:** Accessibility checks add development time but reduce duplicated custom interaction code and costly late fixes.
+- **Learning:** Attempting, retrieving, and correcting is more valuable than
+  copying several solutions. Keep the scope to one understood pattern today.
+
+## Exit checklist
+
+- [ ] I completed DSA Day 14 before reading its solution.
+- [ ] I can state the invariant and complexity without notes.
+- [ ] I completed or verified the MiniTrack milestone.
+- [ ] I tested one success path and one failure path.
+- [ ] I completed the deliberate debugging exercise.
+- [ ] I answered all four interview questions aloud.
+- [ ] I recorded what remains confusing and tomorrow's first task.
+
+**Suggested commit:** `prep day 14: make the complete flow accessible`

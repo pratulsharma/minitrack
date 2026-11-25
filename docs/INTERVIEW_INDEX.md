@@ -1,5 +1,9 @@
 # MiniTrack Days 1–15 interview concept index
 
+For a calendar-based combination of these app concepts with Python DSA,
+debugging, system design, and mock interviews, use the
+[25-day guided interview-preparation lessons](../lessons/interview-prep/README.md).
+
 | Concept | Where to study | Question to explain aloud |
 |---|---|---|
 | Call stack | `lessons/day-01.md`, `exercises/js-predictions.js` | Why does synchronous code print before callbacks? |

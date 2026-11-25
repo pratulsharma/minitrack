@@ -1,0 +1,248 @@
+# Prep Day 16 — Run the quality gate and a full-stack mock
+
+**Date:** Saturday, December 12, 2026  
+**Time:** 7 study hours plus breaks  
+**Starting point:** App Days 1–4 are complete. Continue from the current learner workspace and the previous preparation-day exit checklist.  
+**Goal:** Run the quality gate and a full-stack mock.
+
+[Prep Day 15](prep-day-15.md) · [Preparation plan](../../docs/FULL_STACK_INTERVIEW_PREP_PLAN.md) · [Track home](README.md) · [Prep Day 17](prep-day-17.md)
+
+**Canonical study material:** [Acceptance checklist](../../CHECKLIST.md) · [Interview index](../../docs/INTERVIEW_INDEX.md) · [DSA Day 16](../../dsa-python/lessons/dsa-day-16.md)
+
+## Learning objectives
+
+- explain explaining the complete browser journey in beginner-friendly language;
+- explain running tests, type-check, build, and browser checks and its failure boundary;
+- implement or verify the listed MiniTrack milestone;
+- solve DSA Day 16 using the recursive tree DFS pattern;
+- record the result in your rough notebook and explain it without reading.
+
+## 1. Start with notebook recall (45 minutes)
+
+Before opening a lesson, write answers in
+[`checkpoints/ROUGH/Notes.md`](../../checkpoints/ROUGH/Notes.md):
+
+1. What did yesterday's browser action send to the server?
+2. Where is persistent task data stored, and what state is only temporary?
+3. What error or edge case can you already predict for today's topic?
+4. What do you remember about the **recursive tree DFS** pattern?
+
+Use this format:
+
+```md
+## Saturday, December 12, 2026
+
+- What:
+- Why:
+- How MiniTrack uses it:
+- What can go wrong:
+- First task:
+```
+
+Do not copy the source paragraph. Write what you remember, then compare.
+
+## 2. Understand today's full-stack boundary (20 minutes)
+
+**Frontend focus — Explaining the complete browser journey:** Start with the user event, describe state and rendering, identify the HTTP request, then explain how the refreshed server data reaches the client.
+
+**Backend focus — Running tests, type-check, build, and browser checks:** Each gate proves a different property: tests prove selected behavior, type-check proves static contracts, build proves production compilation, and browser checks prove the integrated journey.
+
+**Today's connection:** A release candidate needs code, data, security, accessibility, and operational evidence together.
+
+```mermaid
+flowchart LR
+  Recall["Recall from notebook"] --> DSA["DSA 16: recursive tree DFS"]
+  DSA --> FE["Frontend: Explaining the complete browser journey"]
+  FE --> BE["Backend: Running tests, type-check, build, and browser checks"]
+  BE --> App["MiniTrack: Run the quality gate and a full-stack mock"]
+  App --> Explain["Explain, test, and record gaps"]
+```
+
+## 3. Python DSA practice (1 hour 45 minutes)
+
+**Problem and reference:** [DSA Day 16](../../dsa-python/lessons/dsa-day-16.md)  
+**Practice file:** [`dsa-python/practice/day-16.py`](../../dsa-python/practice/day-16.py)  
+**Pattern:** recursive tree DFS
+
+### Invariant to say aloud
+
+The depth of a node is one plus the greater depth of its left and right subtrees, with an empty tree at zero.
+
+### Work in this order
+
+1. Restate the problem and ask about constraints.
+2. Give a brute-force approach and its cost before optimizing.
+3. Write the invariant above in your own words.
+4. Implement without opening the solution for 25 minutes.
+5. Test empty, smallest, typical, duplicate, and boundary cases where relevant.
+6. Use a small hint if blocked; do not spend the entire block stuck.
+7. Compare with the commented reference and re-code the key loop from memory.
+
+From the repository root:
+
+```bash
+python3 dsa-python/scripts/check_practice.py 16
+python3 -m unittest discover -s dsa-python/tests -v
+```
+
+**Expected observation:** the day-specific checker accepts your implementation,
+and the completed reference suite still passes.
+
+## 4. Frontend guided study (1 hour 30 minutes)
+
+### What
+
+Start with the user event, describe state and rendering, identify the HTTP request, then explain how the refreshed server data reaches the client.
+
+### Why
+
+The browser layer should make state and feedback understandable without taking
+ownership of persistent data or security decisions that belong on the server.
+
+### How
+
+Read the relevant canonical app lesson linked above. Before revealing its full
+code, sketch the component state, user event, request, success result, and
+failure result.
+
+Files to open deliberately:
+
+- `frontend/package.json`
+- `frontend/test`
+- `frontend/app`
+
+Answer before coding:
+
+- Which value is persistent, and which value is temporary interaction state?
+- What starts this behavior?
+- What should the user see while work is pending?
+- What should remain unchanged when the operation fails?
+
+## 5. Backend guided study (1 hour 30 minutes)
+
+### What
+
+Each gate proves a different property: tests prove selected behavior, type-check proves static contracts, build proves production compilation, and browser checks prove the integrated journey.
+
+### Boundary checklist
+
+- Validate untrusted path, query, and body values.
+- Authenticate identity when the route is protected.
+- Authorize the resource separately from authentication.
+- Bind SQL values rather than concatenating untrusted data.
+- Return an explicit success or error status.
+- Log internal failures on the server without exposing secrets.
+
+Use the canonical app lesson for complete implementation code. Type the new
+code yourself in the learner workspace; do not copy from
+`reference/frontend-complete/` before attempting it.
+
+## 6. MiniTrack implementation (1 hour)
+
+**Milestone source:** Days 5–13 verification and end-to-end explanation
+
+1. Run the repository's focused tests, type-check, and production build.
+2. Complete the critical browser journey as an authenticated user.
+3. Run a 45-minute mock and record the two highest-value gaps.
+
+Run the smallest checks that cover today's change. Use the exact commands from
+the canonical lesson or the relevant package scripts.
+
+**Expected observation:** the user-visible milestone works, its important
+failure path is explicit, and existing behavior remains intact.
+
+## 7. Trace the event or request
+
+```mermaid
+sequenceDiagram
+  participant U as You
+  participant B as Browser or interviewer
+  participant A as Application boundary
+  participant D as Data or algorithm state
+  U->>B: Start the day's action
+  B->>A: Send event, request, or explanation
+  A->>A: Validate assumptions and inputs
+  A->>D: Perform bounded operation
+  D-->>A: Return result or failure
+  A-->>B: Observable outcome
+  B-->>U: Verify and explain without notes
+```
+
+Trace one concrete input. Name every boundary, value, and possible failure.
+
+## 8. Deliberate debugging exercise (25 minutes)
+
+**Break it:** Treat a successful production build as proof that authorization works.
+
+**Predict before running:** write the expected symptom in your notebook.
+
+**Expected symptom:** Security logic may compile perfectly while allowing cross-user access.
+
+**Root cause:** Compilation and behavior verification answer different questions.
+
+**Restore and verify:** Run the negative authorization tests as a separate required gate.
+
+Do not stop after making the symptom disappear. Explain why the repair restores
+the intended invariant.
+
+## 9. Interview questions and answers (30 minutes)
+
+### Q1. What is explaining the complete browser journey?
+
+**Interview-ready answer:** Start with the user event, describe state and rendering, identify the HTTP request, then explain how the refreshed server data reaches the client.
+
+**Example:** Use `frontend/package.json` and point to the state, event, or rendered
+behavior involved in today's milestone.
+
+**Senior follow-up:** Explain when this frontend choice would become difficult
+to maintain and what measurement or requirement would justify a different
+design.
+
+### Q2. How should the backend handle running tests, type-check, build, and browser checks?
+
+**Interview-ready answer:** Each gate proves a different property: tests prove selected behavior, type-check proves static contracts, build proves production compilation, and browser checks prove the integrated journey.
+
+**Example:** Trace the relevant Route Handler or server boundary into the
+MiniTrack data function and back to its response.
+
+**Senior follow-up:** Describe the failure mode, logging requirement, and what
+must remain private when the dependency is unavailable.
+
+### Q3. What invariant makes the recursive tree DFS solution correct?
+
+**Interview-ready answer:** The depth of a node is one plus the greater depth of its left and right subtrees, with an empty tree at zero.
+
+**Example:** Dry-run the first non-trivial sample from DSA Day 16 and
+show the state after each iteration.
+
+**Senior follow-up:** State the assumptions under which the claimed complexity
+holds and how changed constraints might require another approach.
+
+### Q4. How does today's work fit the complete MiniTrack system?
+
+**Interview-ready answer:** A release candidate needs code, data, security, accessibility, and operational evidence together.
+
+**Example:** Begin with one user action and finish with the visible result or
+verified system state.
+
+**Senior follow-up:** Identify the first bottleneck, security risk, or
+operational signal you would measure before adding infrastructure.
+
+## 10. Complexity and operational cost
+
+- **DSA:** O(n) time and O(h) call-stack space.
+- **Application:** A full gate is slower than a focused check, so use focused feedback while coding and the complete gate at milestones.
+- **Learning:** Attempting, retrieving, and correcting is more valuable than
+  copying several solutions. Keep the scope to one understood pattern today.
+
+## Exit checklist
+
+- [ ] I completed DSA Day 16 before reading its solution.
+- [ ] I can state the invariant and complexity without notes.
+- [ ] I completed or verified the MiniTrack milestone.
+- [ ] I tested one success path and one failure path.
+- [ ] I completed the deliberate debugging exercise.
+- [ ] I answered all four interview questions aloud.
+- [ ] I recorded what remains confusing and tomorrow's first task.
+
+**Suggested commit:** `prep day 16: run the quality gate and a full-stack mock`
