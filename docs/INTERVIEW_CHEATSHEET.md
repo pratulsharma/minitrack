@@ -591,24 +591,29 @@ before saving it:
 
 ```ts
 export async function POST(request: Request): Promise<Response> {
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
     return Response.json(await createTask(title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 ```
+
+`parsingBody` starts as `true` and becomes `false` after the JSON is read.
+The single `catch` uses it to distinguish invalid JSON (400) from a later
+server failure (logged and returned as 500). For example, a database error
+still returns 500 even if it is also a `SyntaxError`.
 
 `normalizeTitle` trims a string and accepts 1–200 characters; `isRecord`
 checks that the JSON body is an object. Both are imported from
@@ -670,14 +675,15 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not add task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       setTitle('');
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -722,7 +728,9 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
 `value` and `onChange` make the input controlled by React. The input remains
 available after a failed request; after success, `router.refresh()` asks the
-server for fresh task data. Disabling the button reduces duplicate clicks but
+server for fresh task data. `setBusy(false)` runs before each early return and
+on the success and error paths, so the button becomes usable again. Disabling
+the button reduces duplicate clicks but
 does not guarantee server-side idempotency. The refreshed props may arrive
 after `busy` becomes false.
 
@@ -1394,22 +1402,21 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  if (!isRecord(body) || typeof body.done !== 'boolean') {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
-
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body) || typeof body.done !== 'boolean') {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
     const task = await setDone(id, body.done);
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     // Full details stay in the server log; the client gets a generic message.
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
@@ -1512,14 +1519,15 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not add task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       setTitle('');
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -1537,13 +1545,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not update task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -1557,13 +1566,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not delete task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -2304,47 +2314,45 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  if (!isRecord(body)) {
-    return Response.json({ error: 'Request body must be an object' }, { status: 400 });
-  }
-
-  const hasDone = Object.hasOwn(body, 'done');
-  const hasTitle = Object.hasOwn(body, 'title');
-
-  // Both true or both false means the request contract is ambiguous.
-  if (hasDone === hasTitle) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  // Choose the operation now; run it later inside one shared try/catch.
-  let updateTask: () => Promise<Task | null>;
-
-  if (hasTitle) {
-    const title = normalizeTitle(body.title);
-    if (!title) {
-      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body)) {
+      return Response.json({ error: 'Request body must be an object' }, { status: 400 });
     }
-    updateTask = () => renameTask(id, title);
-  } else if (typeof body.done === 'boolean') {
-    const done = body.done;
-    updateTask = () => setDone(id, done);
-  } else {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
 
-  try {
+    const hasDone = Object.hasOwn(body, 'done');
+    const hasTitle = Object.hasOwn(body, 'title');
+
+    // Both true or both false means the request contract is ambiguous.
+    if (hasDone === hasTitle) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
+    }
+
+    // Choose the operation first, then run it below.
+    let updateTask: () => Promise<Task | null>;
+
+    if (hasTitle) {
+      const title = normalizeTitle(body.title);
+      if (!title) {
+        return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+      }
+      updateTask = () => renameTask(id, title);
+    } else if (typeof body.done === 'boolean') {
+      const done = body.done;
+      updateTask = () => setDone(id, done);
+    } else {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
     const task = await updateTask();
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -3050,14 +3058,15 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not add task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       setTitle('');
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -3074,13 +3083,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not update task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -3093,13 +3103,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not delete task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -3141,15 +3152,16 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       if (!response.ok) {
         // Keep editingId and editTitle so the user can fix or retry.
         setError(`Could not save task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       setEditingId(null);
       setEditTitle('');
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -4772,19 +4784,19 @@ export async function GET(request: NextRequest): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   // Network JSON is untrusted, so keep it unknown until validation.
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
     return Response.json(await createTask(title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -7840,21 +7852,19 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // JSON from the network is untrusted, so keep it unknown until validation.
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
     return Response.json(await createTask(title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -7886,44 +7896,42 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  if (!isRecord(body)) {
-    return Response.json({ error: 'Request body must be an object' }, { status: 400 });
-  }
-
-  const hasDone = Object.hasOwn(body, 'done');
-  const hasTitle = Object.hasOwn(body, 'title');
-  // One operation per request keeps update validation unambiguous.
-  if (hasDone === hasTitle) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  let updateTask: () => ReturnType<typeof renameTask>;
-  if (hasTitle) {
-    const title = normalizeTitle(body.title);
-    if (!title) {
-      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body)) {
+      return Response.json({ error: 'Request body must be an object' }, { status: 400 });
     }
-    updateTask = () => renameTask(id, title);
-  } else if (typeof body.done === 'boolean') {
-    const done = body.done;
-    updateTask = () => setDone(id, done);
-  } else {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
 
-  try {
+    const hasDone = Object.hasOwn(body, 'done');
+    const hasTitle = Object.hasOwn(body, 'title');
+    // One operation per request keeps update validation unambiguous.
+    if (hasDone === hasTitle) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
+    }
+
+    let updateTask: () => ReturnType<typeof renameTask>;
+    if (hasTitle) {
+      const title = normalizeTitle(body.title);
+      if (!title) {
+        return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+      }
+      updateTask = () => renameTask(id, title);
+    } else if (typeof body.done === 'boolean') {
+      const done = body.done;
+      updateTask = () => setDone(id, done);
+    } else {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
     const task = await updateTask();
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -8987,22 +8995,20 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
     // The owner comes from the verified session, never from the request body.
     return Response.json(await createTask(session.user.id, title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -9865,43 +9871,42 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  if (!isRecord(body)) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  const hasDone = Object.hasOwn(body, 'done');
-  const hasTitle = Object.hasOwn(body, 'title');
-  if (hasDone === hasTitle) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  let updateTask: () => Promise<Task | null>;
-  if (hasTitle) {
-    const title = normalizeTitle(body.title);
-    if (!title) {
-      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body)) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
     }
-    updateTask = () => renameTask(ownerId, id, title);
-  } else if (typeof body.done === 'boolean') {
-    const done = body.done;
-    updateTask = () => setDone(ownerId, id, done);
-  } else {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
 
-  try {
+    const hasDone = Object.hasOwn(body, 'done');
+    const hasTitle = Object.hasOwn(body, 'title');
+    if (hasDone === hasTitle) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
+    }
+
+    let updateTask: () => Promise<Task | null>;
+    if (hasTitle) {
+      const title = normalizeTitle(body.title);
+      if (!title) {
+        return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+      }
+      updateTask = () => renameTask(ownerId, id, title);
+    } else if (typeof body.done === 'boolean') {
+      const done = body.done;
+      updateTask = () => setDone(ownerId, id, done);
+    } else {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
     const task = await updateTask();
     // null means missing OR owned by someone else; both are 404 on purpose.
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -10809,22 +10814,20 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
     // The owner comes from the verified session, never from the request body.
     return Response.json(await createTask(session.user.id, title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -10860,42 +10863,41 @@ export async function handlePatchTask(
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  if (!isRecord(body)) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  const hasDone = Object.hasOwn(body, 'done');
-  const hasTitle = Object.hasOwn(body, 'title');
-  if (hasDone === hasTitle) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  let updateTask: () => Promise<Task | null>;
-  if (hasTitle) {
-    const title = normalizeTitle(body.title);
-    if (!title) {
-      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body)) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
     }
-    updateTask = () => renameTask(ownerId, id, title);
-  } else if (typeof body.done === 'boolean') {
-    const done = body.done;
-    updateTask = () => setDone(ownerId, id, done);
-  } else {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
 
-  try {
+    const hasDone = Object.hasOwn(body, 'done');
+    const hasTitle = Object.hasOwn(body, 'title');
+    if (hasDone === hasTitle) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
+    }
+
+    let updateTask: () => Promise<Task | null>;
+    if (hasTitle) {
+      const title = normalizeTitle(body.title);
+      if (!title) {
+        return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+      }
+      updateTask = () => renameTask(ownerId, id, title);
+    } else if (typeof body.done === 'boolean') {
+      const done = body.done;
+      updateTask = () => setDone(ownerId, id, done);
+    } else {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
     const task = await updateTask();
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -11730,21 +11732,19 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
     return Response.json(await createTask(session.user.id, title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     // Full details stay in the server log; the browser gets a generic message.
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
@@ -12033,15 +12033,16 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       const response = await fetch(path, options);
       if (!response.ok) {
         showError(await readErrorMessage(response));
+        setBusy(false);
         return false;
       }
       router.refresh(); // Re-run the Server Component to read PostgreSQL again.
+      setBusy(false);
       return true;
     } catch {
       showError('Could not connect to the server.');
-      return false;
-    } finally {
       setBusy(false);
+      return false;
     }
   }
 
@@ -13289,15 +13290,16 @@ can skip rows whose props did not change.
          const response = await fetch(path, options);
          if (!response.ok) {
            showError(await readErrorMessage(response));
+           setBusy(false);
            return false;
          }
          router.refresh();
+         setBusy(false);
          return true;
        } catch {
          showError('Could not connect to the server.');
-         return false;
-       } finally {
          setBusy(false);
+         return false;
        }
      },
      [router], // State setters are already stable, so only router is listed.
@@ -13979,15 +13981,16 @@ async function request(
     const response = await fetch(path, options);
     if (!response.ok) {
       showError(await readErrorMessage(response)); // e.g. "Task not found"
+      setBusy(false);
       return false;
     }
     router.refresh(); // re-run page.tsx on the server and send new props
+    setBusy(false);
     return true;
   } catch {
     showError('Could not connect to the server.');
-    return false;
-  } finally {
     setBusy(false);
+    return false;
   }
 }
 
@@ -17969,23 +17972,22 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // 2. Parse: network JSON is untrusted, so keep it unknown until validated.
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+    const body: unknown = await request.json();
+    parsingBody = false;
+    // 3. Validate: a trimmed string of 1–200 characters.
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
 
-  // 3. Validate: a trimmed string of 1–200 characters.
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-
-  // 4. Persist with the owner from the verified session, then 5. respond.
-  try {
+    // 4. Persist with the owner from the verified session, then 5. respond.
     return Response.json(await createTask(session.user.id, title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -18049,44 +18051,43 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  if (!isRecord(body)) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  const hasDone = Object.hasOwn(body, 'done');
-  const hasTitle = Object.hasOwn(body, 'title');
-  // Both true or both false means the request contract is ambiguous.
-  if (hasDone === hasTitle) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  let updateTask: () => Promise<Task | null>;
-  if (hasTitle) {
-    const title = normalizeTitle(body.title);
-    if (!title) {
-      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body)) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
     }
-    updateTask = () => renameTask(ownerId, id, title);
-  } else if (typeof body.done === 'boolean') {
-    const done = body.done;
-    updateTask = () => setDone(ownerId, id, done);
-  } else {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
 
-  try {
+    const hasDone = Object.hasOwn(body, 'done');
+    const hasTitle = Object.hasOwn(body, 'title');
+    // Both true or both false means the request contract is ambiguous.
+    if (hasDone === hasTitle) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
+    }
+
+    let updateTask: () => Promise<Task | null>;
+    if (hasTitle) {
+      const title = normalizeTitle(body.title);
+      if (!title) {
+        return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+      }
+      updateTask = () => renameTask(ownerId, id, title);
+    } else if (typeof body.done === 'boolean') {
+      const done = body.done;
+      updateTask = () => setDone(ownerId, id, done);
+    } else {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
     const task = await updateTask();
     // null means "no row with this id AND this owner": not found, not an exception.
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -20590,22 +20591,21 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  if (!isRecord(body) || typeof body.done !== 'boolean') {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
-
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body) || typeof body.done !== 'boolean') {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
     const task = await setDone(id, body.done);
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -20694,44 +20694,44 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
   }
 
   // 3. Parse and validate the untrusted body.
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  if (!isRecord(body)) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  const hasDone = Object.hasOwn(body, 'done');
-  const hasTitle = Object.hasOwn(body, 'title');
-  // Both true or both false means the request contract is ambiguous.
-  if (hasDone === hasTitle) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  let updateTask: () => Promise<Task | null>;
-  if (hasTitle) {
-    const title = normalizeTitle(body.title);
-    if (!title) {
-      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body)) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
     }
-    updateTask = () => renameTask(ownerId, id, title);
-  } else if (typeof body.done === 'boolean') {
-    const done = body.done;
-    updateTask = () => setDone(ownerId, id, done);
-  } else {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
 
-  // 4. Authorize inside the query: zero rows means missing OR not yours.
-  try {
+    const hasDone = Object.hasOwn(body, 'done');
+    const hasTitle = Object.hasOwn(body, 'title');
+    // Both true or both false means the request contract is ambiguous.
+    if (hasDone === hasTitle) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
+    }
+
+    let updateTask: () => Promise<Task | null>;
+    if (hasTitle) {
+      const title = normalizeTitle(body.title);
+      if (!title) {
+        return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+      }
+      updateTask = () => renameTask(ownerId, id, title);
+    } else if (typeof body.done === 'boolean') {
+      const done = body.done;
+      updateTask = () => setDone(ownerId, id, done);
+    } else {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
+
+    // 4. Authorize inside the query: zero rows means missing OR not yours.
     const task = await updateTask();
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }

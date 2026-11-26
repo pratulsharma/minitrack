@@ -448,21 +448,19 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
     return Response.json(await createTask(session.user.id, title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     // Full details stay in the server log; the browser gets a generic message.
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
@@ -751,15 +749,16 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       const response = await fetch(path, options);
       if (!response.ok) {
         showError(await readErrorMessage(response));
+        setBusy(false);
         return false;
       }
       router.refresh(); // Re-run the Server Component to read PostgreSQL again.
+      setBusy(false);
       return true;
     } catch {
       showError('Could not connect to the server.');
-      return false;
-    } finally {
       setBusy(false);
+      return false;
     }
   }
 

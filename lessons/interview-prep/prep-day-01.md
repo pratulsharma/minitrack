@@ -334,24 +334,29 @@ before saving it:
 
 ```ts
 export async function POST(request: Request): Promise<Response> {
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
     return Response.json(await createTask(title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 ```
+
+`parsingBody` starts as `true` and becomes `false` after the JSON is read.
+The single `catch` uses it to distinguish invalid JSON (400) from a later
+server failure (logged and returned as 500). For example, a database error
+still returns 500 even if it is also a `SyntaxError`.
 
 `normalizeTitle` trims a string and accepts 1–200 characters; `isRecord`
 checks that the JSON body is an object. Both are imported from
@@ -413,14 +418,15 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not add task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       setTitle('');
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -465,7 +471,9 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
 `value` and `onChange` make the input controlled by React. The input remains
 available after a failed request; after success, `router.refresh()` asks the
-server for fresh task data. Disabling the button reduces duplicate clicks but
+server for fresh task data. `setBusy(false)` runs before each early return and
+on the success and error paths, so the button becomes usable again. Disabling
+the button reduces duplicate clicks but
 does not guarantee server-side idempotency. The refreshed props may arrive
 after `busy` becomes false.
 

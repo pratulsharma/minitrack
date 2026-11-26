@@ -484,22 +484,21 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  if (!isRecord(body) || typeof body.done !== 'boolean') {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
-
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body) || typeof body.done !== 'boolean') {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
     const task = await setDone(id, body.done);
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     // Full details stay in the server log; the client gets a generic message.
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
@@ -602,14 +601,15 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not add task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       setTitle('');
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -627,13 +627,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not update task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -647,13 +648,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not delete task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }

@@ -489,21 +489,19 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // JSON from the network is untrusted, so keep it unknown until validation.
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
     return Response.json(await createTask(title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -535,44 +533,42 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  if (!isRecord(body)) {
-    return Response.json({ error: 'Request body must be an object' }, { status: 400 });
-  }
-
-  const hasDone = Object.hasOwn(body, 'done');
-  const hasTitle = Object.hasOwn(body, 'title');
-  // One operation per request keeps update validation unambiguous.
-  if (hasDone === hasTitle) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  let updateTask: () => ReturnType<typeof renameTask>;
-  if (hasTitle) {
-    const title = normalizeTitle(body.title);
-    if (!title) {
-      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body)) {
+      return Response.json({ error: 'Request body must be an object' }, { status: 400 });
     }
-    updateTask = () => renameTask(id, title);
-  } else if (typeof body.done === 'boolean') {
-    const done = body.done;
-    updateTask = () => setDone(id, done);
-  } else {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
 
-  try {
+    const hasDone = Object.hasOwn(body, 'done');
+    const hasTitle = Object.hasOwn(body, 'title');
+    // One operation per request keeps update validation unambiguous.
+    if (hasDone === hasTitle) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
+    }
+
+    let updateTask: () => ReturnType<typeof renameTask>;
+    if (hasTitle) {
+      const title = normalizeTitle(body.title);
+      if (!title) {
+        return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+      }
+      updateTask = () => renameTask(id, title);
+    } else if (typeof body.done === 'boolean') {
+      const done = body.done;
+      updateTask = () => setDone(id, done);
+    } else {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
     const task = await updateTask();
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }

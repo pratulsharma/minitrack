@@ -488,19 +488,19 @@ export async function GET(request: NextRequest): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   // Network JSON is untrusted, so keep it unknown until validation.
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-  try {
+    const body: unknown = await request.json();
+    parsingBody = false;
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
     return Response.json(await createTask(title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }

@@ -211,3 +211,14 @@ Interview-ready answer: A key identifies an item among its siblings so React can
 - note that for the delete and update we need id; the path will have the id ../tasks/id/
 - the FE we create the dir structure --> tasks/[id]/route.ts 
 - type RouteContext = {params: Promise<id: string>}
+
+11/24/2026
+
+- controlled input --> where the form input value is a state --> defined by the user input can be changed by onChange; 
+- post validation --> possibly the validation of the user input 
+- persistance --> db 
+- failure boundary --> defined in the validation 
+- onChange changes the used input --
+- onsubmit submits the form object 
+- preventDefault prevents the form reload 
+- 

@@ -478,14 +478,15 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not add task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       setTitle('');
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -502,13 +503,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not update task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -521,13 +523,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       if (!response.ok) {
         setError(`Could not delete task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }
@@ -569,15 +572,16 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       if (!response.ok) {
         // Keep editingId and editTitle so the user can fix or retry.
         setError(`Could not save task (${response.status})`);
+        setBusy(false);
         return;
       }
 
       setEditingId(null);
       setEditTitle('');
       router.refresh();
+      setBusy(false);
     } catch {
       setError('Could not connect to the server');
-    } finally {
       setBusy(false);
     }
   }

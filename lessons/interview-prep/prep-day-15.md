@@ -769,15 +769,16 @@ can skip rows whose props did not change.
          const response = await fetch(path, options);
          if (!response.ok) {
            showError(await readErrorMessage(response));
+           setBusy(false);
            return false;
          }
          router.refresh();
+         setBusy(false);
          return true;
        } catch {
          showError('Could not connect to the server.');
-         return false;
-       } finally {
          setBusy(false);
+         return false;
        }
      },
      [router], // State setters are already stable, so only router is listed.

@@ -430,15 +430,16 @@ async function request(
     const response = await fetch(path, options);
     if (!response.ok) {
       showError(await readErrorMessage(response)); // e.g. "Task not found"
+      setBusy(false);
       return false;
     }
     router.refresh(); // re-run page.tsx on the server and send new props
+    setBusy(false);
     return true;
   } catch {
     showError('Could not connect to the server.');
-    return false;
-  } finally {
     setBusy(false);
+    return false;
   }
 }
 

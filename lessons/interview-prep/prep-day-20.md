@@ -678,23 +678,22 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // 2. Parse: network JSON is untrusted, so keep it unknown until validated.
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+    const body: unknown = await request.json();
+    parsingBody = false;
+    // 3. Validate: a trimmed string of 1–200 characters.
+    const title = normalizeTitle(isRecord(body) ? body.title : undefined);
+    if (!title) {
+      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    }
 
-  // 3. Validate: a trimmed string of 1–200 characters.
-  const title = normalizeTitle(isRecord(body) ? body.title : undefined);
-  if (!title) {
-    return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
-  }
-
-  // 4. Persist with the owner from the verified session, then 5. respond.
-  try {
+    // 4. Persist with the owner from the verified session, then 5. respond.
     return Response.json(await createTask(session.user.id, title), { status: 201 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error('POST /api/tasks failed:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -758,44 +757,43 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
     return Response.json({ error: 'Invalid task ID' }, { status: 400 });
   }
 
-  let body: unknown;
+  let parsingBody = true;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  if (!isRecord(body)) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  const hasDone = Object.hasOwn(body, 'done');
-  const hasTitle = Object.hasOwn(body, 'title');
-  // Both true or both false means the request contract is ambiguous.
-  if (hasDone === hasTitle) {
-    return Response.json({ error: 'Provide either done or title' }, { status: 400 });
-  }
-
-  let updateTask: () => Promise<Task | null>;
-  if (hasTitle) {
-    const title = normalizeTitle(body.title);
-    if (!title) {
-      return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+    const body: unknown = await request.json();
+    parsingBody = false;
+    if (!isRecord(body)) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
     }
-    updateTask = () => renameTask(ownerId, id, title);
-  } else if (typeof body.done === 'boolean') {
-    const done = body.done;
-    updateTask = () => setDone(ownerId, id, done);
-  } else {
-    return Response.json({ error: 'done must be boolean' }, { status: 400 });
-  }
 
-  try {
+    const hasDone = Object.hasOwn(body, 'done');
+    const hasTitle = Object.hasOwn(body, 'title');
+    // Both true or both false means the request contract is ambiguous.
+    if (hasDone === hasTitle) {
+      return Response.json({ error: 'Provide either done or title' }, { status: 400 });
+    }
+
+    let updateTask: () => Promise<Task | null>;
+    if (hasTitle) {
+      const title = normalizeTitle(body.title);
+      if (!title) {
+        return Response.json({ error: 'title must be 1–200 characters' }, { status: 400 });
+      }
+      updateTask = () => renameTask(ownerId, id, title);
+    } else if (typeof body.done === 'boolean') {
+      const done = body.done;
+      updateTask = () => setDone(ownerId, id, done);
+    } else {
+      return Response.json({ error: 'done must be boolean' }, { status: 400 });
+    }
     const task = await updateTask();
     // null means "no row with this id AND this owner": not found, not an exception.
     return task
       ? Response.json(task)
       : Response.json({ error: 'Task not found' }, { status: 404 });
   } catch (error: unknown) {
+    if (parsingBody) {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     console.error(`PATCH /api/tasks/${id} failed:`, error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
