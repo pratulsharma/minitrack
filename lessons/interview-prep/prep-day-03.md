@@ -326,8 +326,8 @@ await fetch('/api/tasks/7', {
 }).then(response => response.status);
 ```
 
-Expect `200`. Reload the page: the new title appears because `page.tsx` reads
-it from PostgreSQL.
+Expect `200`. Reload the page: it requests the task list from the API, which
+reads the new title from PostgreSQL.
 
 Files to open deliberately:
 
@@ -719,7 +719,7 @@ probabilistic filter that accepts false positives.
 
 **Example:** `{"title":"   "}` is rejected with 400 by `normalizeTitle` before
 `renameTask` is called; a valid rename reaches PostgreSQL once, and the next
-`page.tsx` render shows the saved title via `listTasks()`.
+client can read the saved title through `GET /api/tasks` and update its state.
 
 **Senior follow-up:** Track 400 vs 404 vs 500 counts for `PATCH
 /api/tasks/[id]`. A spike in 400s suggests a client bug or contract change;

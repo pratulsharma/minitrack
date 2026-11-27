@@ -14,9 +14,10 @@ filtering belong to Prep Day 02. Write runnable code in the named project and
 practice files, not in this Markdown file.
 
 **Transition note:** This day now uses a Client Component and `GET /api/tasks`
-to load tasks. Later prep days still use the earlier Server Component and
-`router.refresh()` approach and have not yet been converted; their replacement
-code is not compatible with this page without further changes.
+to load tasks. Prep Days 02–04 continue this approach. Prep Days 05–25 still
+use the earlier Server Component and `router.refresh()` approach and have not
+yet been converted; their replacement code is not compatible with this page
+without further changes.
 
 ## Learning objectives
 
@@ -416,14 +417,21 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { Task } from './types';
 
 export default function Home() {
+  // The list is a browser-side copy; PostgreSQL remains the source of truth.
   const [tasks, setTasks] = useState<Task[]>([]);
+  // Keep the form draft separate from saved tasks.
   const [title, setTitle] = useState('');
+  // Prevent another submission while POST and the following GET are pending.
   const [busy, setBusy] = useState(false);
+  // Show POST failures without discarding the user's draft.
   const [error, setError] = useState('');
+  // The list has its own status because GET can fail even after POST succeeds.
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  // Remember the active GET so an older response cannot replace a newer list.
   const currentLoad = useRef<AbortController | null>(null);
 
+  // Load the current task list from the API, not directly from PostgreSQL.
   const loadTasks = useCallback(async () => {
     currentLoad.current?.abort();
     const controller = new AbortController();
@@ -454,11 +462,13 @@ export default function Home() {
     }
   }, []);
 
+  // Load on mount and cancel the outstanding request when leaving the page.
   useEffect(() => {
     void loadTasks();
     return () => currentLoad.current?.abort();
   }, [loadTasks]);
 
+  // Save the draft, then reload the list only after the POST succeeds.
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanTitle = title.trim();
@@ -492,11 +502,15 @@ export default function Home() {
   }
 
   return (
+    // mx-auto centers; max-w-5xl limits width; px/py add horizontal/vertical padding.
     <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
       <h1 className="text-4xl font-bold">MiniTrack</h1>
       <section className="mt-8">
+      {/* flex lays controls in a row; flex-wrap lets them wrap on small screens. */}
       <form onSubmit={addTask} className="flex flex-wrap gap-3">
+        {/* sr-only keeps the label accessible without showing it visually. */}
         <label htmlFor="task-title" className="sr-only">Task title</label>
+        {/* flex-1 fills available space; rounded, border, bg, and px/py style the field. */}
         <input
           id="task-title"
           className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2"
@@ -506,6 +520,7 @@ export default function Home() {
           maxLength={200}
           disabled={busy || loading}
         />
+        {/* violet background; disabled:opacity-50 fades the button when disabled. */}
         <button
           type="submit"
           className="rounded-lg bg-violet-600 px-4 py-2 disabled:opacity-50"
@@ -525,6 +540,7 @@ export default function Home() {
         </div>
       )}
       <p className="mt-4 text-slate-400">{tasks.length} tasks</p>
+      {/* mt-4 adds spacing; rounded, border and bg make a dark list card. */}
       <ul className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
         {tasks.map(task => (
           <li key={task.id} className="flex gap-3 border-b border-slate-700 px-5 py-4 last:border-b-0">

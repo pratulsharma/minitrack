@@ -48,11 +48,11 @@ Do not copy the source paragraph. Write what you remember, then compare.
 
 ## 2. Understand today's full-stack boundary (20 minutes)
 
-**Frontend focus — Event handlers and derived state:** A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task props plus the selected filter. Derived values should not be copied into a second state variable.
+**Frontend focus — Event handlers and derived state:** A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task state plus the selected filter. Derived values should not be copied into a second state variable.
 
 **Backend focus — PATCH and DELETE by resource ID:** The dynamic Route Handler validates the path ID, validates the PATCH body, and calls parameterized UPDATE or DELETE functions. Missing tasks return 404 instead of success-shaped data.
 
-**Today's connection:** The task ID travels in the URL, the new value travels in JSON when needed, and router.refresh requests authoritative rows after mutation.
+**Today's connection:** The task ID travels in the URL, the new value travels in JSON when needed, and the client requests the latest rows after a successful mutation.
 
 ```mermaid
 flowchart LR
@@ -310,7 +310,7 @@ tuple key costs O(m) per word but only works for a fixed alphabet.
 
 ### What
 
-A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task props plus the selected filter. Derived values should not be copied into a second state variable.
+A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task state plus the selected filter. Derived values should not be copied into a second state variable.
 
 ### Why
 
@@ -351,7 +351,7 @@ which the callback returns `true`; it does not change `tasks`.
 
 Files to open deliberately:
 
-- `frontend/app/TaskBoard.tsx`
+- `frontend/app/page.tsx`
 - `frontend/app/api/tasks/[id]/route.ts`
 - `frontend/lib/validation.ts`
 
@@ -549,31 +549,72 @@ finally `404` because the task is already gone.
 
 ## 6. MiniTrack implementation (1 hour)
 
-### Step 1: Extend the task board
+### Step 1: Extend the client page
 
 First try it yourself in three passes, running the app after each: connect the
 checkbox to PATCH, connect Delete to DELETE, then add the filter. Then compare
-with this full updated `frontend/app/TaskBoard.tsx`. The `addTask` function and
+with this full updated `frontend/app/page.tsx`. The `addTask` function and
 the add form are unchanged from Prep Day 01; lines marked `NEW` are today's
 work.
 
 ```tsx
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Task } from './types';
 
 type Filter = 'all' | 'open' | 'done'; // NEW
 
-export default function TaskBoard({ tasks }: { tasks: Task[] }) {
+export default function Home() {
+  // This is a displayed copy; PostgreSQL keeps the saved data.
+  const [tasks, setTasks] = useState<Task[]>([]);
+  // The draft and selected filter are temporary user choices.
   const [title, setTitle] = useState('');
   const [filter, setFilter] = useState<Filter>('all'); // NEW
+  // Track mutation errors separately from loading errors.
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const currentLoad = useRef<AbortController | null>(null);
 
-  // NEW: derived from props + filter during rendering; never stored in state.
+  // GET the latest list and cancel an older request before starting a new one.
+  const loadTasks = useCallback(async () => {
+    currentLoad.current?.abort();
+    const controller = new AbortController();
+    currentLoad.current = controller;
+    setLoading(true);
+    setLoadError('');
+
+    try {
+      const response = await fetch('/api/tasks', {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+      if (!response.ok) {
+        setLoadError(`Could not load tasks (${response.status})`);
+        setLoading(false);
+        return;
+      }
+
+      const data: Task[] = await response.json();
+      if (controller.signal.aborted) return;
+      setTasks(data);
+      setLoading(false);
+    } catch {
+      if (controller.signal.aborted) return;
+      setLoadError('Could not load tasks. Check your connection and try again.');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTasks();
+    return () => currentLoad.current?.abort();
+  }, [loadTasks]);
+
+  // NEW: derived from task state + filter during rendering.
   let visibleTasks = tasks;
   if (filter === 'open') {
     visibleTasks = tasks.filter(task => !task.done);
@@ -582,6 +623,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
     visibleTasks = tasks.filter(task => task.done);
   }
 
+  // Submit a new title and reload the saved list after success.
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanTitle = title.trim();
@@ -606,7 +648,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       }
 
       setTitle('');
-      router.refresh();
+      await loadTasks();
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -631,7 +673,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         return;
       }
 
-      router.refresh();
+      await loadTasks();
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -652,7 +694,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         return;
       }
 
-      router.refresh();
+      await loadTasks();
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -661,8 +703,13 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
   }
 
   return (
-    <section className="mt-8">
+    // mx-auto centers the page; max-w-5xl limits width; px/py add padding.
+    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
+      <h1 className="text-4xl font-bold">MiniTrack</h1>
+      <section className="mt-8">
+      {/* flex displays controls in a row; flex-wrap and gap help on small screens. */}
       <form onSubmit={addTask} className="flex flex-wrap gap-3">
+        {/* sr-only hides the label visually but keeps it available to screen readers. */}
         <label htmlFor="task-title" className="sr-only">Task title</label>
         <input
           id="task-title"
@@ -671,12 +718,13 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           onChange={event => setTitle(event.target.value)}
           placeholder="What needs doing?"
           maxLength={200}
-          disabled={busy}
+          disabled={busy || loading}
         />
+        {/* bg-violet-600 colors the button; disabled:opacity-50 fades it when disabled. */}
         <button
           type="submit"
           className="rounded-lg bg-violet-600 px-4 py-2 disabled:opacity-50"
-          disabled={busy}
+          disabled={busy || loading}
         >
           {busy ? 'Adding...' : 'Add task'}
         </button>
@@ -697,6 +745,15 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       </label>
 
       {error && <p role="alert" className="mt-3 text-rose-300">{error}</p>}
+      {loading && <p role="status" className="mt-3 text-slate-400">Loading tasks...</p>}
+      {loadError && (
+        <div role="alert" className="mt-3 text-rose-300">
+          <p>{loadError}</p>
+          <button type="button" onClick={() => void loadTasks()} disabled={loading}>
+            Retry loading tasks
+          </button>
+        </div>
+      )}
       <p className="mt-4 text-slate-400">
         Showing {visibleTasks.length} of {tasks.length} tasks
       </p>
@@ -716,7 +773,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                 aria-label={`Complete ${task.title}`}
                 type="checkbox"
                 checked={task.done}
-                disabled={busy}
+                disabled={busy || loading}
                 onChange={event => {
                   void toggleTask(task.id, event.target.checked);
                 }}
@@ -727,7 +784,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
               {/* NEW: type="button" so it can never submit a form. */}
               <button
                 className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-rose-400/10 hover:text-rose-300"
-                disabled={busy}
+                disabled={busy || loading}
                 type="button"
                 onClick={() => {
                   void deleteTask(task.id);
@@ -739,20 +796,18 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           ))}
         </ul>
       )}
-    </section>
+      </section>
+    </main>
   );
 }
 ```
 
-The checkbox's `checked` value comes from the `task` prop, which comes from
-PostgreSQL. Clicking it does not flip anything locally; it asks the server, then
-`router.refresh()` brings back the saved value. If the request fails, the box
-stays in its old position and the error explains why. `busy` disables controls
-during a request to reduce double clicks, but it is not server-side protection.
-
-`frontend/app/page.tsx` does **not** change today: it already reads
-`listTasks()` inside `<Suspense>` after `await io()` and passes the rows to
-`<TaskBoard tasks={tasks} />`.
+The checkbox's `checked` value comes from the task list in React state.
+Clicking it sends the change to the server; after success, `loadTasks()` calls
+GET to read the saved list again. If the mutation fails, the old list remains
+and an error explains why. If the mutation succeeds but the GET fails, the
+list may be stale: use **Retry loading tasks** rather than repeating the
+mutation. `busy` reduces double clicks but is not server-side protection.
 
 ### Step 2: Run and verify
 
@@ -791,10 +846,10 @@ failure path is explicit, and existing behavior remains intact.
 ```mermaid
 sequenceDiagram
   participant U as You
-  participant B as TaskBoard.tsx (browser)
+  participant B as page.tsx (browser)
   participant A as api/tasks/[id]/route.ts
+  participant G as api/tasks/route.ts
   participant D as PostgreSQL
-  participant S as page.tsx (Server Component)
   U->>B: Tick the checkbox for task 7
   B->>B: toggleTask("7", true); setBusy(true)
   B->>A: PATCH /api/tasks/7 body {"done":true}
@@ -802,10 +857,10 @@ sequenceDiagram
   A->>D: UPDATE tasks SET done = $1 WHERE id = $2 RETURNING ...
   D-->>A: Updated row (or no row)
   A-->>B: 200 task JSON (or 404 / 500)
-  B->>S: router.refresh()
-  S->>D: listTasks(): SELECT ... ORDER BY id
-  D-->>S: Fresh rows
-  S-->>B: New tasks prop; visibleTasks recalculated
+  B->>G: GET /api/tasks
+  G->>D: listTasks(): SELECT ... ORDER BY id
+  D-->>G: Fresh rows
+  G-->>B: JSON tasks; visibleTasks recalculated
   B-->>U: Box stays ticked and the filter view updates
 ```
 
@@ -819,7 +874,7 @@ reaches PostgreSQL.
 
 **Predict before running:** write the expected symptom in your notebook.
 
-**Expected symptom:** The list can become stale when fresh task props arrive.
+**Expected symptom:** The list can become stale when fresh tasks arrive.
 
 **Root cause:** Duplicated state has two sources that must be synchronized.
 
@@ -837,9 +892,9 @@ the intended invariant.
 
 ### Q1. What are event handlers and derived state?
 
-**Interview-ready answer:** A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task props plus the selected filter. Derived values should not be copied into a second state variable.
+**Interview-ready answer:** A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task state plus the selected filter. Derived values should not be copied into a second state variable.
 
-**Example:** In `frontend/app/TaskBoard.tsx`, the checkbox calls
+**Example:** In `frontend/app/page.tsx`, the checkbox calls
 `toggleTask(task.id, event.target.checked)` and Delete calls
 `deleteTask(task.id)`. `filter` is `useState<Filter>('all')`, while
 `visibleTasks` is a plain variable computed with `tasks.filter(...)` on every
@@ -879,15 +934,15 @@ without holding both strings.
 
 ### Q4. How does today's work fit the complete MiniTrack system?
 
-**Interview-ready answer:** The task ID travels in the URL, the new value travels in JSON when needed, and router.refresh requests authoritative rows after mutation.
+**Interview-ready answer:** The task ID travels in the URL, the new value travels in JSON when needed, and the client requests the latest rows after mutation.
 
 **Example:** Ticking task 7 sends `PATCH /api/tasks/7` with
 `{"done":true}`; the Route Handler runs `UPDATE ... WHERE id = $2`; after 200,
-`router.refresh()` makes `page.tsx` call `listTasks()` again; `TaskBoard`
-receives new props and recalculates `visibleTasks`.
+`loadTasks()` calls `GET /api/tasks`, whose handler calls `listTasks()`.
+The page updates task state and recalculates `visibleTasks`.
 
 **Senior follow-up:** Each mutation costs two round trips (mutation plus
-refresh read). Measure p95 latency of `/api/tasks/[id]` and page refresh before
+GET). Measure p95 latency of `/api/tasks/[id]` and `/api/tasks` before
 adding optimistic UI or caching; also log 404 and 500 rates per route.
 
 ## 10. Complexity and operational cost

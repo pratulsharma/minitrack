@@ -1,5 +1,10 @@
 # Prep Day 05 — Make search and filters shareable
 
+> **Architecture transition:** This lesson still uses server-rendered task
+> data and has not yet been adapted to the client-fetch page introduced in
+> Prep Days 01–04. Its page and task-board code cannot be applied directly
+> to that client page without further changes.
+
 **Date:** Monday, November 30, 2026  
 **Time:** 7 study hours plus breaks  
 **Starting point:** App Days 1–4 are complete. Continue from the current learner workspace and the previous preparation-day exit checklist.  

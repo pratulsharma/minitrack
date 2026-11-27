@@ -10,7 +10,7 @@
 **Everything to read today is below.** The original [App Day 7](../day-07.md)
 and [DSA Day 04](../../dsa-python/lessons/dsa-day-04.md) remain available for
 comparison. This prep day adds Edit, Save, and Cancel controls to
-`TaskBoard.tsx` and uses the title-rename API built in Prep Day 03 without
+`page.tsx` and uses the title-rename API built in Prep Day 03 without
 changing it. Adding, completing, deleting, and filtering came from Prep Days
 01–02 and must keep working. Search and shareable URL filters belong to Prep
 Day 05. Write runnable code in the named project and practice files, not in
@@ -325,7 +325,7 @@ stateDiagram-v2
   Saving --> Editing: API failure
 ```
 
-Three new pieces of client-only state live in `TaskBoard`:
+Three new pieces of client-only state live in `page.tsx`:
 
 ```ts
 const [editingId, setEditingId] = useState<string | null>(null);
@@ -336,7 +336,8 @@ const editInputRef = useRef<HTMLInputElement>(null);
 - `editingId` answers **which** task is being edited (`null` means none). A
   plain `true/false` could not say which row to show as a form.
 - `editTitle` is the uncommitted draft. It is copied from `task.title` when
-  editing starts, so the user can change it without touching the `task` prop.
+  editing starts, so the user can change it without mutating the saved task
+  in React state.
 - `editInputRef` is a **ref**: a box whose `.current` React fills with the
   real `<input>` element after it appears on screen. Changing a ref does not
   re-render.
@@ -371,7 +372,7 @@ Accessibility rules for today:
 
 Files to open deliberately:
 
-- `frontend/app/TaskBoard.tsx`
+- `frontend/app/page.tsx`
 - `frontend/app/api/tasks/[id]/route.ts`
 
 Answer before coding:
@@ -399,9 +400,9 @@ The server rejects invalid or missing updates explicitly. The client should keep
 No server file changes today. The browser reuses Prep Day 03's contract in
 `frontend/app/api/tasks/[id]/route.ts`:
 
-| Browser sends | Server responds | What `TaskBoard` must do |
+| Browser sends | Server responds | What the client page must do |
 |---|---|---|
-| `{"title":"Buy oat milk"}` for an existing task | `200` + updated task | Leave edit mode; `router.refresh()` |
+| `{"title":"Buy oat milk"}` for an existing task | `200` + updated task | Leave edit mode; call `loadTasks()` |
 | `{"title":"   "}` (if the client check is bypassed) | `400` | Stay in edit mode; keep draft; show error |
 | A title for a task deleted in another tab | `404` | Stay in edit mode; keep draft; show error |
 | Any request while PostgreSQL is down | `500` | Stay in edit mode; keep draft; show error |
@@ -421,27 +422,68 @@ if the save fails.
 
 First try it yourself in passes, running the app after each: add the two state
 values and the Edit button, render the edit form, add the focus effect, then
-save. Then compare with this full updated `frontend/app/TaskBoard.tsx`. Code
+save. Then compare with this full updated `frontend/app/page.tsx`. Code
 from Prep Day 02 is unchanged; lines marked `NEW` are today's work.
 
 ```tsx
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react'; // NEW: useEffect, useRef
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Task } from './types';
 
 type Filter = 'all' | 'open' | 'done';
 
-export default function TaskBoard({ tasks }: { tasks: Task[] }) {
+export default function Home() {
+  // The API supplies this displayed copy; PostgreSQL stores the saved tasks.
+  const [tasks, setTasks] = useState<Task[]>([]);
+  // These states hold the add draft, chosen filter, and current edit draft.
   const [title, setTitle] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [editingId, setEditingId] = useState<string | null>(null); // NEW
   const [editTitle, setEditTitle] = useState(''); // NEW: uncommitted draft
+  // Track mutation status separately from list-loading status.
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null); // NEW
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const currentLoad = useRef<AbortController | null>(null);
+
+  // GET the latest list; cancel an older request before starting a new one.
+  const loadTasks = useCallback(async () => {
+    currentLoad.current?.abort();
+    const controller = new AbortController();
+    currentLoad.current = controller;
+    setLoading(true);
+    setLoadError('');
+
+    try {
+      const response = await fetch('/api/tasks', {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+      if (!response.ok) {
+        setLoadError(`Could not load tasks (${response.status})`);
+        setLoading(false);
+        return;
+      }
+
+      const data: Task[] = await response.json();
+      if (controller.signal.aborted) return;
+      setTasks(data);
+      setLoading(false);
+    } catch {
+      if (controller.signal.aborted) return;
+      setLoadError('Could not load tasks. Check your connection and try again.');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTasks();
+    return () => currentLoad.current?.abort();
+  }, [loadTasks]);
 
   let visibleTasks = tasks;
   if (filter === 'open') {
@@ -459,6 +501,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
     }
   }, [editingId]);
 
+  // Save a new task, then reload the list from the API.
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanTitle = title.trim();
@@ -483,7 +526,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       }
 
       setTitle('');
-      router.refresh();
+      await loadTasks();
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -491,6 +534,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
     }
   }
 
+  // Send the checkbox value to the API; do not mutate the task locally.
   async function toggleTask(taskId: string, done: boolean) {
     setBusy(true);
     setError('');
@@ -507,7 +551,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         return;
       }
 
-      router.refresh();
+      await loadTasks();
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -515,6 +559,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
     }
   }
 
+  // Delete by ID, then reload so the saved list is displayed.
   async function deleteTask(taskId: string) {
     setBusy(true);
     setError('');
@@ -527,7 +572,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         return;
       }
 
-      router.refresh();
+      await loadTasks();
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -578,7 +623,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       setEditingId(null);
       setEditTitle('');
-      router.refresh();
+      await loadTasks();
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -587,8 +632,13 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
   }
 
   return (
-    <section className="mt-8">
+    // mx-auto centers the page; max-w-5xl limits width; px/py add padding.
+    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
+      <h1 className="text-4xl font-bold">MiniTrack</h1>
+      <section className="mt-8">
+      {/* flex displays controls in a row; flex-wrap allows wrapping on small screens. */}
       <form onSubmit={addTask} className="flex flex-wrap gap-3">
+        {/* sr-only hides the label visually while screen readers can still use it. */}
         <label htmlFor="task-title" className="sr-only">Task title</label>
         <input
           id="task-title"
@@ -597,12 +647,12 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           onChange={event => setTitle(event.target.value)}
           placeholder="What needs doing?"
           maxLength={200}
-          disabled={busy}
+          disabled={busy || loading}
         />
         <button
           type="submit"
           className="rounded-lg bg-violet-600 px-4 py-2 disabled:opacity-50"
-          disabled={busy}
+          disabled={busy || loading}
         >
           {busy ? 'Adding...' : 'Add task'}
         </button>
@@ -622,6 +672,15 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       </label>
 
       {error && <p role="alert" className="mt-3 text-rose-300">{error}</p>}
+      {loading && <p role="status" className="mt-3 text-slate-400">Loading tasks...</p>}
+      {loadError && (
+        <div role="alert" className="mt-3 text-rose-300">
+          <p>{loadError}</p>
+          <button type="button" onClick={() => void loadTasks()} disabled={loading}>
+            Retry loading tasks
+          </button>
+        </div>
+      )}
       <p className="mt-4 text-slate-400">
         Showing {visibleTasks.length} of {tasks.length} tasks
       </p>
@@ -640,7 +699,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                 aria-label={`Complete ${task.title}`}
                 type="checkbox"
                 checked={task.done}
-                disabled={busy}
+                disabled={busy || loading}
                 onChange={event => {
                   void toggleTask(task.id, event.target.checked);
                 }}
@@ -648,6 +707,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
               {/* NEW: this row shows either the edit form or the normal view. */}
               {editingId === task.id ? (
                 <form className="flex min-w-0 flex-1 items-center gap-2" onSubmit={saveTask}>
+                  {/* flex-1 fills the row; gap-2 separates the form controls. */}
                   <label className="sr-only" htmlFor={`edit-${task.id}`}>
                     Edit {task.title}
                   </label>
@@ -658,19 +718,19 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                     value={editTitle}
                     onChange={event => setEditTitle(event.target.value)}
                     maxLength={200}
-                    disabled={busy}
+                    disabled={busy || loading}
                   />
                   <button
                     className="rounded-lg px-3 py-2 text-violet-300 hover:bg-slate-800"
                     type="submit"
-                    disabled={busy}
+                    disabled={busy || loading}
                   >
                     Save
                   </button>
                   <button
                     className="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-800"
                     type="button"
-                    disabled={busy}
+                    disabled={busy || loading}
                     onClick={cancelEditing}
                   >
                     Cancel
@@ -685,14 +745,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                     <button
                       className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
                       type="button"
-                      disabled={busy}
+                      disabled={busy || loading}
                       onClick={() => startEditing(task)}
                     >
                       Edit
                     </button>
                     <button
                       className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-rose-400/10 hover:text-rose-300"
-                      disabled={busy}
+                      disabled={busy || loading}
                       type="button"
                       onClick={() => {
                         void deleteTask(task.id);
@@ -707,25 +767,25 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           ))}
         </ul>
       )}
-    </section>
+      </section>
+    </main>
   );
 }
 ```
 
 Important decisions:
 
-- The draft is local state; the saved title is always `task.title` from
-  PostgreSQL. Never write `task.title = editTitle`: that changes nothing in the
-  database and breaks React's assumption that props are read-only.
+- The draft is local state; the task list is a copy loaded from PostgreSQL.
+  Never write `task.title = editTitle`: that changes nothing in the database
+  and mutates React state instead of updating it properly.
 - This is **not** optimistic UI: the old title stays visible in the list until
-  the server confirms and `router.refresh()` returns fresh props.
+  the server confirms and `loadTasks()` reads the list again.
 - `<>...</>` is a **fragment**: it groups two elements without adding an
   extra DOM element.
 - Starting a second edit simply replaces `editingId` and the draft; the first
   draft is discarded deliberately.
 
-`frontend/app/page.tsx`, `frontend/lib/tasks.ts`, and both Route Handlers do
-**not** change today.
+`frontend/lib/tasks.ts` and both Route Handlers do **not** change today.
 
 ### Step 2: Run and verify
 
@@ -773,10 +833,10 @@ failure path is explicit, and existing behavior remains intact.
 ```mermaid
 sequenceDiagram
   participant U as You
-  participant C as TaskBoard.tsx (browser)
+  participant C as page.tsx (browser)
   participant A as api/tasks/[id]/route.ts
   participant P as PostgreSQL
-  participant S as page.tsx (Server Component)
+  participant G as api/tasks/route.ts
   U->>C: Click Edit on task 7 "Buy milk"
   C->>C: startEditing: editingId "7", editTitle "Buy milk"
   C->>C: Effect runs after render: focus() and select()
@@ -787,10 +847,10 @@ sequenceDiagram
   P-->>A: Updated row (or no row / error)
   A-->>C: 200 task JSON (or 400 / 404 / 500)
   C->>C: On 200 clear edit state; on failure keep draft and show error
-  C->>S: router.refresh() (success only)
-  S->>P: listTasks()
-  P-->>S: Fresh rows
-  S-->>C: New tasks prop shows "Buy oat milk"
+  C->>G: GET /api/tasks (success only)
+  G->>P: listTasks()
+  P-->>G: Fresh rows
+  G-->>C: JSON updates task state
   C-->>U: Row back in viewing mode with the saved title
 ```
 
@@ -825,7 +885,7 @@ the intended invariant.
 
 **Interview-ready answer:** State stores which task is being edited and the draft title. A ref points to the rendered input, and an effect focuses it because focus synchronizes React with the browser DOM.
 
-**Example:** In `frontend/app/TaskBoard.tsx`, clicking Edit on task 7 sets
+**Example:** In `frontend/app/page.tsx`, clicking Edit on task 7 sets
 `editingId` to `"7"` and `editTitle` to `"Buy milk"`. The row renders an
 input with `ref={editInputRef}`, and the effect keyed on `[editingId]` calls
 `focus()` and `select()` after that input exists.
@@ -865,8 +925,8 @@ k trades or fees, you need a dynamic-programming state per day.
 **Interview-ready answer:** Local draft state supports interaction while PostgreSQL remains the final persisted state.
 
 **Example:** `editTitle` holds "Buy oat milk" only in the browser until
-`PATCH /api/tasks/7` returns 200. Then `router.refresh()` re-runs `page.tsx`,
-`listTasks()` reads PostgreSQL, and `TaskBoard` shows the saved title.
+`PATCH /api/tasks/7` returns 200. Then `loadTasks()` calls `GET /api/tasks`,
+the route reads PostgreSQL, and the page shows the saved title.
 
 **Senior follow-up:** Each save costs a PATCH plus a refresh read. If users
 find saving slow, measure that latency first; optimistic UI could show the new
