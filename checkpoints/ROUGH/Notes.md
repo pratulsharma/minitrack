@@ -212,7 +212,7 @@ Interview-ready answer: A key identifies an item among its siblings so React can
 - the FE we create the dir structure --> tasks/[id]/route.ts 
 - type RouteContext = {params: Promise<id: string>}
 
-11/24/2026
+>> 11/24/2026
 
 - controlled input --> where the form input value is a state --> defined by the user input can be changed by onChange; 
 - post validation --> possibly the validation of the user input 
@@ -221,4 +221,26 @@ Interview-ready answer: A key identifies an item among its siblings so React can
 - onChange changes the used input --
 - onsubmit submits the form object 
 - preventDefault prevents the form reload 
-- 
+ >> 11/26/2026
+ I have 3 hrs 30 mins --> lets do a 3 hrs marathon 
+- creating POST function for route.ts 
+- it takes the query input and provides the response - a promise because its a async function 
+- it parses the input; validates the body and then get whatever is needed from the body and then sends 
+-  a response back; 
+- The Request and Response are standard web API types -> Request has headers, body, url and more. Response is what goes back 
+- I will focus on add-task component - a fe component; what does this component do? --> 
+  - this component has a form that allows user to add the task; post the task and add it in the backend db -> postgres db 
+  - for this kind of FE component that has form we typicaly use - states for 
+    - saving the form input
+    - displaying error 
+    - loading/busy
+    - for the post we can also refresh the server side data. 
+    - So how I am going to approach this --> 
+    - 1) define 'use client'; import all that is needed -> types, libs, functions 
+    - 2) define the function and its arguments and type of the arguments 
+    - 3) define the states needed 
+    - 4) define the form - inputs - onChange ; button 
+    - 5) define the error block 
+    - 6) define the list block that displays the list of tasks
+  - I have decided to use the the old way of fetching the tasks - when the page loads, useEffect runs and then calls the get API to fetch the data 
+ 

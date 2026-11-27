@@ -13,6 +13,11 @@ the day's app code are all inside it. Write and run the exercises in the
 separate practice and application files. The original app and DSA lessons
 remain linked from each day for comparison.
 
+**Architecture transition:** Prep Day 01 now fetches tasks in a Client
+Component through the API. Days 02–25 still teach the earlier server-rendered
+approach and need further updates before their code can continue from the new
+Day 01 page.
+
 ## Daily track
 
 | Prep day | Date | Guided lesson | DSA pattern |

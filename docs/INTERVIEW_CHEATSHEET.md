@@ -270,6 +270,11 @@ comparison. This prep day covers only adding tasks; completion, deletion, and
 filtering belong to Prep Day 02. Write runnable code in the named project and
 practice files, not in this Markdown file.
 
+**Transition note:** This day now uses a Client Component and `GET /api/tasks`
+to load tasks. Later prep days still use the earlier Server Component and
+`router.refresh()` approach and have not yet been converted; their replacement
+code is not compatible with this page without further changes.
+
 ### Learning objectives
 
 - explain controlled inputs and form submission in beginner-friendly language;
@@ -306,9 +311,9 @@ Do not copy the source paragraph. Write what you remember, then compare.
 
 **Frontend focus — Controlled inputs and form submission:** React owns a controlled input through its value prop, and onChange updates the state used for the next render. onSubmit handles the form as one user action and preventDefault stops the browser's traditional page navigation.
 
-**Backend focus — POST validation and persistence:** The Route Handler parses untrusted JSON, validates the title, calls the data function, and returns a 201 response. PostgreSQL remains the source of truth; React state only holds the temporary input.
+**Backend focus — POST validation and persistence:** The Route Handler parses untrusted JSON, validates the title, calls the data function, and returns a 201 response. PostgreSQL remains the source of truth; React state holds the temporary input and a displayed copy of the tasks.
 
-**Today's connection:** A browser event becomes validated JSON, a parameterized INSERT, a 201 response, and a refreshed Server Component.
+**Today's connection:** A browser event becomes validated JSON, a parameterized INSERT, and a 201 response. The browser then requests the updated list through `GET /api/tasks`.
 
 ```mermaid
 flowchart LR
@@ -556,7 +561,7 @@ event, request, success result, and failure result.
 
 Files to open deliberately:
 
-- `frontend/app/TaskBoard.tsx`
+- `frontend/app/page.tsx`
 - `frontend/app/api/tasks/route.ts`
 - `frontend/lib/tasks.ts`
 
@@ -571,7 +576,7 @@ Answer before coding:
 
 #### What
 
-The Route Handler parses untrusted JSON, validates the title, calls the data function, and returns a 201 response. PostgreSQL remains the source of truth; React state only holds the temporary input.
+The Route Handler parses untrusted JSON, validates the title, calls the data function, and returns a 201 response. PostgreSQL remains the source of truth; React holds the input and a displayed copy of the task list.
 
 #### Boundary checklist
 
@@ -585,6 +590,24 @@ The Route Handler parses untrusted JSON, validates the title, calls the data fun
 The key existing Day 3 code is shown below for review. Keep any later
 functions already present in these files; these excerpts are not replacement
 files.
+
+The existing `GET` handler reads tasks on the server and returns JSON:
+
+```ts
+export async function GET(): Promise<Response> {
+  try {
+    return Response.json(await listTasks(), {
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  } catch (error: unknown) {
+    console.error('GET /api/tasks failed:', error);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+```
+
+`listTasks` is imported from `frontend/lib/tasks.ts`. The browser never
+connects directly to PostgreSQL; it asks this route for the list.
 
 In `frontend/app/api/tasks/route.ts`, the POST handler validates the request
 before saving it:
@@ -637,24 +660,61 @@ database timestamp to a string for the browser.
 
 ### 6. MiniTrack implementation (1 hour)
 
-#### Step 1: Create the add-task component
+#### Step 1: Create a client page
 
-First try the three steps yourself: render the supplied tasks, connect the
-input to React state, and send a POST request. Then compare with this
-add-task-only implementation in `frontend/app/TaskBoard.tsx`:
+First try the steps yourself: load the tasks from `GET /api/tasks`, connect
+the input to React state, and send a POST request. Then replace
+`frontend/app/page.tsx` with this add-task-only implementation:
 
 ```tsx
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Task } from './types';
 
-export default function TaskBoard({ tasks }: { tasks: Task[] }) {
+export default function Home() {
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const currentLoad = useRef<AbortController | null>(null);
+
+  const loadTasks = useCallback(async () => {
+    currentLoad.current?.abort();
+    const controller = new AbortController();
+    currentLoad.current = controller;
+    setLoading(true);
+    setLoadError('');
+
+    try {
+      const response = await fetch('/api/tasks', {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+      if (!response.ok) {
+        setLoadError(`Could not load tasks (${response.status})`);
+        setLoading(false);
+        return;
+      }
+
+      const data: Task[] = await response.json();
+      if (controller.signal.aborted) return;
+      setTasks(data);
+      setLoading(false);
+    } catch {
+      if (controller.signal.aborted) return;
+      setLoadError('Could not load tasks. Check your connection and try again.');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTasks();
+    return () => currentLoad.current?.abort();
+  }, [loadTasks]);
 
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -680,7 +740,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       }
 
       setTitle('');
-      router.refresh();
+      await loadTasks();
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -689,7 +749,9 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
   }
 
   return (
-    <section className="mt-8">
+    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
+      <h1 className="text-4xl font-bold">MiniTrack</h1>
+      <section className="mt-8">
       <form onSubmit={addTask} className="flex flex-wrap gap-3">
         <label htmlFor="task-title" className="sr-only">Task title</label>
         <input
@@ -699,17 +761,26 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           onChange={event => setTitle(event.target.value)}
           placeholder="What needs doing?"
           maxLength={200}
-          disabled={busy}
+          disabled={busy || loading}
         />
         <button
           type="submit"
           className="rounded-lg bg-violet-600 px-4 py-2 disabled:opacity-50"
-          disabled={busy}
+          disabled={busy || loading}
         >
           {busy ? 'Adding...' : 'Add task'}
         </button>
       </form>
       {error && <p role="alert" className="mt-3 text-rose-300">{error}</p>}
+      {loading && <p role="status" className="mt-3 text-slate-400">Loading tasks...</p>}
+      {loadError && (
+        <div role="alert" className="mt-3 text-rose-300">
+          <p>{loadError}</p>
+          <button type="button" onClick={() => void loadTasks()} disabled={loading}>
+            Retry loading tasks
+          </button>
+        </div>
+      )}
       <p className="mt-4 text-slate-400">{tasks.length} tasks</p>
       <ul className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
         {tasks.map(task => (
@@ -721,78 +792,28 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           </li>
         ))}
       </ul>
-    </section>
-  );
-}
-```
-
-`value` and `onChange` make the input controlled by React. The input remains
-available after a failed request; after success, `router.refresh()` asks the
-server for fresh task data. `setBusy(false)` runs before each early return and
-on the success and error paths, so the button becomes usable again. Disabling
-the button reduces duplicate clicks but
-does not guarantee server-side idempotency. The refreshed props may arrive
-after `busy` becomes false.
-
-#### Step 2: Connect the server page
-
-Replace `frontend/app/page.tsx` with the following. It keeps the database read
-on the server and passes the resulting tasks to the Client Component:
-
-```tsx
-import { Suspense } from 'react';
-import { io } from 'next/cache';
-import TaskBoard from './TaskBoard';
-import { listTasks } from '../lib/tasks';
-import type { Task } from './types';
-
-async function TaskContent() {
-  await io();
-
-  let tasks: Task[] = [];
-  let error: string | null = null;
-  try {
-    tasks = await listTasks();
-  } catch (err) {
-    error = err instanceof Error ? err.message : 'Unable to load tasks';
-  }
-
-  return error ? (
-    <p
-      className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200"
-      role="alert"
-    >
-      Could not load tasks: {error}. Check PostgreSQL and DATABASE_URL.
-    </p>
-  ) : (
-    <TaskBoard tasks={tasks} />
-  );
-}
-
-export default function Home() {
-  return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
-      <header className="mb-8">
-        <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">
-          Your workspace
-        </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight">MiniTrack</h1>
-        <p className="mt-2 text-slate-400">
-          Simple tasks. Serious full-stack concepts.
-        </p>
-      </header>
-      <Suspense fallback={<p className="text-slate-400">Loading tasks...</p>}>
-        <TaskContent />
-      </Suspense>
+      </section>
     </main>
   );
 }
 ```
 
-With Cache Components enabled, `io()` and `Suspense` keep the database read in
-a request-time subtree; do not add `dynamic = 'force-dynamic'`.
+`value` and `onChange` make the input controlled by React. The input remains
+available after a failed POST. After success, `loadTasks()` calls GET again
+and updates the displayed copy; it does not use `router.refresh()`.
 
-#### Step 3: Run and verify
+`useEffect` starts the first GET when the page appears. `useCallback` keeps
+`loadTasks` stable between renders. An `AbortController` cancels an older GET
+when another begins or the page unmounts, preventing an old response from
+replacing a newer list. In development, React may run the effect setup and
+cleanup an extra time; cancellation makes that safe.
+
+The list has its own loading and error state. If POST succeeds but the
+following GET fails, the title is cleared because the task was saved; use
+**Retry loading tasks** rather than submitting it again. Disabling controls
+reduces duplicate clicks but does not guarantee server-side idempotency.
+
+#### Step 2: Run and verify
 
 With PostgreSQL running and your existing `frontend/.env.local` configured,
 run from the repository root:
@@ -805,7 +826,9 @@ npm run dev
 
 Open `http://localhost:3000`, add a task, and reload: the task should remain.
 Try a blank title and confirm that the page shows an error without adding a
-task. In a separate terminal, check the server's validation:
+task. Stop PostgreSQL and reload: a loading error and retry button should
+appear. Restart PostgreSQL and use the retry button to load the list. In a
+separate terminal, check the server's validation:
 
 ```bash
 curl -i -X POST http://localhost:3000/api/tasks \
@@ -823,16 +846,19 @@ failure path is explicit, and existing behavior remains intact.
 ```mermaid
 sequenceDiagram
   participant U as You
-  participant B as Browser or interviewer
-  participant A as Application boundary
-  participant D as Data or algorithm state
-  U->>B: Start the day's action
-  B->>A: Send event, request, or explanation
-  A->>A: Validate assumptions and inputs
-  A->>D: Perform bounded operation
-  D-->>A: Return result or failure
-  A-->>B: Observable outcome
-  B-->>U: Verify and explain without notes
+  participant B as Client page
+  participant A as API route
+  participant D as PostgreSQL
+  U->>B: Submit a task
+  B->>A: POST /api/tasks
+  A->>D: INSERT validated title
+  D-->>A: Saved task
+  A-->>B: 201 Created
+  B->>A: GET /api/tasks
+  A->>D: Read task list
+  D-->>A: Rows
+  A-->>B: JSON task list
+  B-->>U: Display updated list
 ```
 
 Trace one concrete input. Name every boundary, value, and possible failure.
@@ -858,7 +884,7 @@ the intended invariant.
 
 **Interview-ready answer:** React owns a controlled input through its value prop, and onChange updates the state used for the next render. onSubmit handles the form as one user action and preventDefault stops the browser's traditional page navigation.
 
-**Example:** Use `frontend/app/TaskBoard.tsx` and point to the state, event, or rendered
+**Example:** Use `frontend/app/page.tsx` and point to the state, event, or rendered
 behavior involved in today's milestone.
 
 **Senior follow-up:** Explain when this frontend choice would become difficult
@@ -867,7 +893,7 @@ design.
 
 #### Q2. How should the backend handle post validation and persistence?
 
-**Interview-ready answer:** The Route Handler parses untrusted JSON, validates the title, calls the data function, and returns a 201 response. PostgreSQL remains the source of truth; React state only holds the temporary input.
+**Interview-ready answer:** The Route Handler parses untrusted JSON, validates the title, calls the data function, and returns a 201 response. PostgreSQL remains the source of truth; React holds the input and a displayed copy of the task list.
 
 **Example:** Trace the relevant Route Handler or server boundary into the
 MiniTrack data function and back to its response.
@@ -887,7 +913,7 @@ holds and how changed constraints might require another approach.
 
 #### Q4. How does today's work fit the complete MiniTrack system?
 
-**Interview-ready answer:** A browser event becomes validated JSON, a parameterized INSERT, a 201 response, and a refreshed Server Component.
+**Interview-ready answer:** A browser event becomes validated JSON, a parameterized INSERT, and a 201 response. The client then fetches the latest list from the API.
 
 **Example:** Begin with one user action and finish with the visible result or
 verified system state.
@@ -898,7 +924,8 @@ operational signal you would measure before adding infrastructure.
 ### 10. Complexity and operational cost
 
 - **DSA:** O(n) time and O(n) auxiliary space.
-- **Application:** The client does constant local work, while inserting is normally dominated by one network round trip and one indexed database write.
+- **Application:** Adding a task uses a POST followed by a GET. Rendering the
+  returned list takes O(n) work and storing it uses O(n) client space.
 - **Learning:** Attempting, retrieving, and correcting is more valuable than
   copying several solutions. Keep the scope to one understood pattern today.
 
