@@ -244,3 +244,5 @@ Interview-ready answer: A key identifies an item among its siblings so React can
     - 6) define the list block that displays the list of tasks
   - I have decided to use the the old way of fetching the tasks - when the page loads, useEffect runs and then calls the get API to fetch the data 
  
+
+ - Brain dump -> start with writing the input 

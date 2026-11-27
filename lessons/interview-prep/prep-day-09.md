@@ -1,5 +1,9 @@
 # Prep Day 09 — Add authentication and client session Context
 
+> **Architecture transition:** This lesson still uses server-rendered task
+> data and has not yet been adapted to the client-fetch page from Prep Days
+> 01–08. Its page code cannot be applied directly without further changes.
+
 **Date:** Friday, December 4, 2026  
 **Time:** 7 study hours plus breaks  
 **Starting point:** App Days 1–4 are complete. Continue from the current learner workspace and the previous preparation-day exit checklist.  

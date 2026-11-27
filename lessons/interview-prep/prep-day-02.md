@@ -560,7 +560,7 @@ work.
 ```tsx
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { Task } from './types';
 
 type Filter = 'all' | 'open' | 'done'; // NEW
@@ -576,43 +576,34 @@ export default function Home() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const currentLoad = useRef<AbortController | null>(null);
+  // Change this number to ask the effect to load the list again.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // GET the latest list and cancel an older request before starting a new one.
-  const loadTasks = useCallback(async () => {
-    currentLoad.current?.abort();
-    const controller = new AbortController();
-    currentLoad.current = controller;
-    setLoading(true);
-    setLoadError('');
-
-    try {
-      const response = await fetch('/api/tasks', {
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-      if (!response.ok) {
-        setLoadError(`Could not load tasks (${response.status})`);
-        setLoading(false);
-        return;
-      }
-
-      const data: Task[] = await response.json();
-      if (controller.signal.aborted) return;
-      setTasks(data);
-      setLoading(false);
-    } catch {
-      if (controller.signal.aborted) return;
-      setLoadError('Could not load tasks. Check your connection and try again.');
-      setLoading(false);
-    }
-  }, []);
-
+  // Load on first appearance and whenever a successful change increments reloadKey.
   useEffect(() => {
+    async function loadTasks() {
+      setLoading(true);
+      setLoadError('');
+
+      try {
+        const response = await fetch('/api/tasks', { cache: 'no-store' });
+        if (!response.ok) {
+          setLoadError(`Could not load tasks (${response.status})`);
+          setLoading(false);
+          return;
+        }
+
+        const data: Task[] = await response.json();
+        setTasks(data);
+        setLoading(false);
+      } catch {
+        setLoadError('Could not load tasks. Check your connection and try again.');
+        setLoading(false);
+      }
+    }
+
     void loadTasks();
-    return () => currentLoad.current?.abort();
-  }, [loadTasks]);
+  }, [reloadKey]);
 
   // NEW: derived from task state + filter during rendering.
   let visibleTasks = tasks;
@@ -623,7 +614,7 @@ export default function Home() {
     visibleTasks = tasks.filter(task => task.done);
   }
 
-  // Submit a new title and reload the saved list after success.
+  // Submit a new title; changing reloadKey makes the effect fetch the list again.
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanTitle = title.trim();
@@ -648,7 +639,7 @@ export default function Home() {
       }
 
       setTitle('');
-      await loadTasks();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -673,7 +664,7 @@ export default function Home() {
         return;
       }
 
-      await loadTasks();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -694,7 +685,7 @@ export default function Home() {
         return;
       }
 
-      await loadTasks();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -749,7 +740,11 @@ export default function Home() {
       {loadError && (
         <div role="alert" className="mt-3 text-rose-300">
           <p>{loadError}</p>
-          <button type="button" onClick={() => void loadTasks()} disabled={loading}>
+          <button
+            type="button"
+            onClick={() => setReloadKey(key => key + 1)}
+            disabled={loading}
+          >
             Retry loading tasks
           </button>
         </div>
@@ -803,8 +798,8 @@ export default function Home() {
 ```
 
 The checkbox's `checked` value comes from the task list in React state.
-Clicking it sends the change to the server; after success, `loadTasks()` calls
-GET to read the saved list again. If the mutation fails, the old list remains
+Clicking it sends the change to the server; after success, changing `reloadKey`
+makes the effect call GET to read the saved list again. If the mutation fails, the old list remains
 and an error explains why. If the mutation succeeds but the GET fails, the
 list may be stale: use **Retry loading tasks** rather than repeating the
 mutation. `busy` reduces double clicks but is not server-side protection.
@@ -938,8 +933,8 @@ without holding both strings.
 
 **Example:** Ticking task 7 sends `PATCH /api/tasks/7` with
 `{"done":true}`; the Route Handler runs `UPDATE ... WHERE id = $2`; after 200,
-`loadTasks()` calls `GET /api/tasks`, whose handler calls `listTasks()`.
-The page updates task state and recalculates `visibleTasks`.
+the page increases `reloadKey`. The effect calls `GET /api/tasks`, whose
+handler calls `listTasks()`, then React recalculates `visibleTasks`.
 
 **Senior follow-up:** Each mutation costs two round trips (mutation plus
 GET). Measure p95 latency of `/api/tasks/[id]` and `/api/tasks` before

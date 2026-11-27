@@ -333,7 +333,7 @@ breaks it. If it checks behavior, it only breaks when users would notice.
 ### How
 
 Look at what a user (or screen reader) can actually find in
-`frontend/app/TaskBoard.tsx` and `frontend/app/SearchForm.tsx`:
+`frontend/app/page.tsx` and `frontend/app/SearchForm.tsx`:
 
 | User-visible handle | Where it comes from |
 |---|---|
@@ -630,7 +630,7 @@ the intended invariant.
 
 **Interview-ready answer:** A frontend test should interact through labels, roles, text, and user actions, then assert what a user can observe. Internal state names are implementation details.
 
-**Example:** For `frontend/app/TaskBoard.tsx`, a good check is "the
+**Example:** For `frontend/app/page.tsx`, a good check is "the
 checkbox labelled **Complete Learn React** is still checked after reload", not
 "`toggleTask` was called" or "`busy` became `true`". In today's
 `frontend/test/unit/validation.test.ts`, the same idea means asserting

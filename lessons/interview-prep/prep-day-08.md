@@ -354,7 +354,7 @@ types like a user, and checks what appears on the page. An **E2E** (end-to-end)
 test uses the whole stack: browser → Next.js → PostgreSQL.
 
 Playwright finds elements by their **accessible name**, the same label a screen
-reader announces. Today's test relies on two names that `frontend/app/TaskBoard.tsx`
+reader announces. Today's test relies on two names that `frontend/app/page.tsx`
 already provides from Prep Day 02:
 
 ```tsx
@@ -697,16 +697,20 @@ sequenceDiagram
   T->>D: TRUNCATE tasks RESTART IDENTITY
   T->>B: page.goto('/')
   B->>N: GET /
+  B->>N: GET /api/tasks
   N->>D: SELECT tasks (none)
   T->>B: fill "Practice testing" and click Add task
   B->>N: POST /api/tasks {"title":"Practice testing"}
   N->>D: INSERT ... RETURNING (id 1)
-  N-->>B: 201, then router.refresh()
+  N-->>B: 201 Created
+  B->>N: GET /api/tasks after success
+  N->>D: SELECT tasks
   T->>B: check "Complete Practice testing"
   B->>N: PATCH /api/tasks/1 {"done":true}
   N->>D: UPDATE tasks SET done = true WHERE id = 1
   T->>B: page.reload()
   B->>N: GET /
+  B->>N: GET /api/tasks
   N->>D: SELECT tasks (done = true)
   T->>B: expect checkbox toBeChecked
 ```
@@ -789,7 +793,7 @@ use prefix sums with a monotonic deque instead.
 **Interview-ready answer:** Unit, database, and browser tests cover different boundaries without asking one expensive test to prove everything.
 
 **Example:** A blank title is caught by the `normalizeTitle` unit test; the
-rename SQL is caught by the integration test; a missing `router.refresh()` or
+rename SQL is caught by the integration test; a missing `loadTasks()` call or
 a broken checkbox label is caught only by the Playwright journey.
 
 **Senior follow-up:** Before adding more infrastructure, measure total suite

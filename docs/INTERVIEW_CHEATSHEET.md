@@ -271,9 +271,10 @@ filtering belong to Prep Day 02. Write runnable code in the named project and
 practice files, not in this Markdown file.
 
 **Transition note:** This day now uses a Client Component and `GET /api/tasks`
-to load tasks. Later prep days still use the earlier Server Component and
-`router.refresh()` approach and have not yet been converted; their replacement
-code is not compatible with this page without further changes.
+to load tasks. Prep Days 02–08 continue this approach. Prep Days 09–25 have
+not yet been fully converted from the earlier Server Component and
+`router.refresh()` approach; their instructions may not be compatible with
+this page without further changes.
 
 ### Learning objectives
 
@@ -669,53 +670,51 @@ the input to React state, and send a POST request. Then replace
 ```tsx
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { Task } from './types';
 
 export default function Home() {
+  // The list is a browser-side copy; PostgreSQL remains the source of truth.
   const [tasks, setTasks] = useState<Task[]>([]);
+  // Keep the form draft separate from saved tasks.
   const [title, setTitle] = useState('');
+  // Prevent another submission while POST and the following GET are pending.
   const [busy, setBusy] = useState(false);
+  // Show POST failures without discarding the user's draft.
   const [error, setError] = useState('');
+  // The list has its own status because GET can fail even after POST succeeds.
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const currentLoad = useRef<AbortController | null>(null);
+  // Increase this after a successful save to make the effect load the list again.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const loadTasks = useCallback(async () => {
-    currentLoad.current?.abort();
-    const controller = new AbortController();
-    currentLoad.current = controller;
-    setLoading(true);
-    setLoadError('');
-
-    try {
-      const response = await fetch('/api/tasks', {
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-      if (!response.ok) {
-        setLoadError(`Could not load tasks (${response.status})`);
-        setLoading(false);
-        return;
-      }
-
-      const data: Task[] = await response.json();
-      if (controller.signal.aborted) return;
-      setTasks(data);
-      setLoading(false);
-    } catch {
-      if (controller.signal.aborted) return;
-      setLoadError('Could not load tasks. Check your connection and try again.');
-      setLoading(false);
-    }
-  }, []);
-
+  // Load the list when the page first appears and whenever reloadKey changes.
   useEffect(() => {
-    void loadTasks();
-    return () => currentLoad.current?.abort();
-  }, [loadTasks]);
+    async function loadTasks() {
+      setLoading(true);
+      setLoadError('');
 
+      try {
+        const response = await fetch('/api/tasks', { cache: 'no-store' });
+        if (!response.ok) {
+          setLoadError(`Could not load tasks (${response.status})`);
+          setLoading(false);
+          return;
+        }
+
+        const data: Task[] = await response.json();
+        setTasks(data);
+        setLoading(false);
+      } catch {
+        setLoadError('Could not load tasks. Check your connection and try again.');
+        setLoading(false);
+      }
+    }
+
+    void loadTasks();
+  }, [reloadKey]);
+
+  // Save the draft, then reload the list only after the POST succeeds.
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanTitle = title.trim();
@@ -740,7 +739,8 @@ export default function Home() {
       }
 
       setTitle('');
-      await loadTasks();
+      // Changing the key makes the effect above fetch the list again.
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -749,11 +749,15 @@ export default function Home() {
   }
 
   return (
+    // mx-auto centers; max-w-5xl limits width; px/py add horizontal/vertical padding.
     <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
       <h1 className="text-4xl font-bold">MiniTrack</h1>
       <section className="mt-8">
+      {/* flex lays controls in a row; flex-wrap lets them wrap on small screens. */}
       <form onSubmit={addTask} className="flex flex-wrap gap-3">
+        {/* sr-only keeps the label accessible without showing it visually. */}
         <label htmlFor="task-title" className="sr-only">Task title</label>
+        {/* flex-1 fills available space; rounded, border, bg, and px/py style the field. */}
         <input
           id="task-title"
           className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2"
@@ -763,6 +767,7 @@ export default function Home() {
           maxLength={200}
           disabled={busy || loading}
         />
+        {/* violet background; disabled:opacity-50 fades the button when disabled. */}
         <button
           type="submit"
           className="rounded-lg bg-violet-600 px-4 py-2 disabled:opacity-50"
@@ -776,12 +781,17 @@ export default function Home() {
       {loadError && (
         <div role="alert" className="mt-3 text-rose-300">
           <p>{loadError}</p>
-          <button type="button" onClick={() => void loadTasks()} disabled={loading}>
+          <button
+            type="button"
+            onClick={() => setReloadKey(key => key + 1)}
+            disabled={loading}
+          >
             Retry loading tasks
           </button>
         </div>
       )}
       <p className="mt-4 text-slate-400">{tasks.length} tasks</p>
+      {/* mt-4 adds spacing; rounded, border and bg make a dark list card. */}
       <ul className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
         {tasks.map(task => (
           <li key={task.id} className="flex gap-3 border-b border-slate-700 px-5 py-4 last:border-b-0">
@@ -799,14 +809,17 @@ export default function Home() {
 ```
 
 `value` and `onChange` make the input controlled by React. The input remains
-available after a failed POST. After success, `loadTasks()` calls GET again
-and updates the displayed copy; it does not use `router.refresh()`.
+available after a failed POST. After success, increasing `reloadKey` makes the
+effect call GET again and update the displayed copy; it does not use
+`router.refresh()`.
 
-`useEffect` starts the first GET when the page appears. `useCallback` keeps
-`loadTasks` stable between renders. An `AbortController` cancels an older GET
-when another begins or the page unmounts, preventing an old response from
-replacing a newer list. In development, React may run the effect setup and
-cleanup an extra time; cancellation makes that safe.
+`useEffect` starts the first GET when the page appears. `reloadKey` is a simple
+signal: changing it makes the effect run again. The async `loadTasks` function
+is defined inside the effect, so this example does not need `useCallback`,
+`useRef`, or an `AbortController`.
+This beginner version also does not cancel a request if another refresh starts
+before it finishes; add that extra protection later if overlapping requests
+become a real concern.
 
 The list has its own loading and error state. If POST succeeds but the
 following GET fails, the title is cleared because the task was saved; use
@@ -993,11 +1006,11 @@ Do not copy the source paragraph. Write what you remember, then compare.
 
 ### 2. Understand today's full-stack boundary (20 minutes)
 
-**Frontend focus — Event handlers and derived state:** A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task props plus the selected filter. Derived values should not be copied into a second state variable.
+**Frontend focus — Event handlers and derived state:** A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task state plus the selected filter. Derived values should not be copied into a second state variable.
 
 **Backend focus — PATCH and DELETE by resource ID:** The dynamic Route Handler validates the path ID, validates the PATCH body, and calls parameterized UPDATE or DELETE functions. Missing tasks return 404 instead of success-shaped data.
 
-**Today's connection:** The task ID travels in the URL, the new value travels in JSON when needed, and router.refresh requests authoritative rows after mutation.
+**Today's connection:** The task ID travels in the URL, the new value travels in JSON when needed, and the client requests the latest rows after a successful mutation.
 
 ```mermaid
 flowchart LR
@@ -1255,7 +1268,7 @@ tuple key costs O(m) per word but only works for a fixed alphabet.
 
 #### What
 
-A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task props plus the selected filter. Derived values should not be copied into a second state variable.
+A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task state plus the selected filter. Derived values should not be copied into a second state variable.
 
 #### Why
 
@@ -1296,7 +1309,7 @@ which the callback returns `true`; it does not change `tasks`.
 
 Files to open deliberately:
 
-- `frontend/app/TaskBoard.tsx`
+- `frontend/app/page.tsx`
 - `frontend/app/api/tasks/[id]/route.ts`
 - `frontend/lib/validation.ts`
 
@@ -1494,31 +1507,63 @@ finally `404` because the task is already gone.
 
 ### 6. MiniTrack implementation (1 hour)
 
-#### Step 1: Extend the task board
+#### Step 1: Extend the client page
 
 First try it yourself in three passes, running the app after each: connect the
 checkbox to PATCH, connect Delete to DELETE, then add the filter. Then compare
-with this full updated `frontend/app/TaskBoard.tsx`. The `addTask` function and
+with this full updated `frontend/app/page.tsx`. The `addTask` function and
 the add form are unchanged from Prep Day 01; lines marked `NEW` are today's
 work.
 
 ```tsx
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { Task } from './types';
 
 type Filter = 'all' | 'open' | 'done'; // NEW
 
-export default function TaskBoard({ tasks }: { tasks: Task[] }) {
+export default function Home() {
+  // This is a displayed copy; PostgreSQL keeps the saved data.
+  const [tasks, setTasks] = useState<Task[]>([]);
+  // The draft and selected filter are temporary user choices.
   const [title, setTitle] = useState('');
   const [filter, setFilter] = useState<Filter>('all'); // NEW
+  // Track mutation errors separately from loading errors.
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  // Change this number to ask the effect to load the list again.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // NEW: derived from props + filter during rendering; never stored in state.
+  // Load on first appearance and whenever a successful change increments reloadKey.
+  useEffect(() => {
+    async function loadTasks() {
+      setLoading(true);
+      setLoadError('');
+
+      try {
+        const response = await fetch('/api/tasks', { cache: 'no-store' });
+        if (!response.ok) {
+          setLoadError(`Could not load tasks (${response.status})`);
+          setLoading(false);
+          return;
+        }
+
+        const data: Task[] = await response.json();
+        setTasks(data);
+        setLoading(false);
+      } catch {
+        setLoadError('Could not load tasks. Check your connection and try again.');
+        setLoading(false);
+      }
+    }
+
+    void loadTasks();
+  }, [reloadKey]);
+
+  // NEW: derived from task state + filter during rendering.
   let visibleTasks = tasks;
   if (filter === 'open') {
     visibleTasks = tasks.filter(task => !task.done);
@@ -1527,6 +1572,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
     visibleTasks = tasks.filter(task => task.done);
   }
 
+  // Submit a new title; changing reloadKey makes the effect fetch the list again.
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanTitle = title.trim();
@@ -1551,7 +1597,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       }
 
       setTitle('');
-      router.refresh();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -1576,7 +1622,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         return;
       }
 
-      router.refresh();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -1597,7 +1643,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         return;
       }
 
-      router.refresh();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -1606,8 +1652,13 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
   }
 
   return (
-    <section className="mt-8">
+    // mx-auto centers the page; max-w-5xl limits width; px/py add padding.
+    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
+      <h1 className="text-4xl font-bold">MiniTrack</h1>
+      <section className="mt-8">
+      {/* flex displays controls in a row; flex-wrap and gap help on small screens. */}
       <form onSubmit={addTask} className="flex flex-wrap gap-3">
+        {/* sr-only hides the label visually but keeps it available to screen readers. */}
         <label htmlFor="task-title" className="sr-only">Task title</label>
         <input
           id="task-title"
@@ -1616,12 +1667,13 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           onChange={event => setTitle(event.target.value)}
           placeholder="What needs doing?"
           maxLength={200}
-          disabled={busy}
+          disabled={busy || loading}
         />
+        {/* bg-violet-600 colors the button; disabled:opacity-50 fades it when disabled. */}
         <button
           type="submit"
           className="rounded-lg bg-violet-600 px-4 py-2 disabled:opacity-50"
-          disabled={busy}
+          disabled={busy || loading}
         >
           {busy ? 'Adding...' : 'Add task'}
         </button>
@@ -1642,6 +1694,19 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       </label>
 
       {error && <p role="alert" className="mt-3 text-rose-300">{error}</p>}
+      {loading && <p role="status" className="mt-3 text-slate-400">Loading tasks...</p>}
+      {loadError && (
+        <div role="alert" className="mt-3 text-rose-300">
+          <p>{loadError}</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey(key => key + 1)}
+            disabled={loading}
+          >
+            Retry loading tasks
+          </button>
+        </div>
+      )}
       <p className="mt-4 text-slate-400">
         Showing {visibleTasks.length} of {tasks.length} tasks
       </p>
@@ -1661,7 +1726,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                 aria-label={`Complete ${task.title}`}
                 type="checkbox"
                 checked={task.done}
-                disabled={busy}
+                disabled={busy || loading}
                 onChange={event => {
                   void toggleTask(task.id, event.target.checked);
                 }}
@@ -1672,7 +1737,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
               {/* NEW: type="button" so it can never submit a form. */}
               <button
                 className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-rose-400/10 hover:text-rose-300"
-                disabled={busy}
+                disabled={busy || loading}
                 type="button"
                 onClick={() => {
                   void deleteTask(task.id);
@@ -1684,20 +1749,18 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           ))}
         </ul>
       )}
-    </section>
+      </section>
+    </main>
   );
 }
 ```
 
-The checkbox's `checked` value comes from the `task` prop, which comes from
-PostgreSQL. Clicking it does not flip anything locally; it asks the server, then
-`router.refresh()` brings back the saved value. If the request fails, the box
-stays in its old position and the error explains why. `busy` disables controls
-during a request to reduce double clicks, but it is not server-side protection.
-
-`frontend/app/page.tsx` does **not** change today: it already reads
-`listTasks()` inside `<Suspense>` after `await io()` and passes the rows to
-`<TaskBoard tasks={tasks} />`.
+The checkbox's `checked` value comes from the task list in React state.
+Clicking it sends the change to the server; after success, changing `reloadKey`
+makes the effect call GET to read the saved list again. If the mutation fails, the old list remains
+and an error explains why. If the mutation succeeds but the GET fails, the
+list may be stale: use **Retry loading tasks** rather than repeating the
+mutation. `busy` reduces double clicks but is not server-side protection.
 
 #### Step 2: Run and verify
 
@@ -1736,10 +1799,10 @@ failure path is explicit, and existing behavior remains intact.
 ```mermaid
 sequenceDiagram
   participant U as You
-  participant B as TaskBoard.tsx (browser)
+  participant B as page.tsx (browser)
   participant A as api/tasks/[id]/route.ts
+  participant G as api/tasks/route.ts
   participant D as PostgreSQL
-  participant S as page.tsx (Server Component)
   U->>B: Tick the checkbox for task 7
   B->>B: toggleTask("7", true); setBusy(true)
   B->>A: PATCH /api/tasks/7 body {"done":true}
@@ -1747,10 +1810,10 @@ sequenceDiagram
   A->>D: UPDATE tasks SET done = $1 WHERE id = $2 RETURNING ...
   D-->>A: Updated row (or no row)
   A-->>B: 200 task JSON (or 404 / 500)
-  B->>S: router.refresh()
-  S->>D: listTasks(): SELECT ... ORDER BY id
-  D-->>S: Fresh rows
-  S-->>B: New tasks prop; visibleTasks recalculated
+  B->>G: GET /api/tasks
+  G->>D: listTasks(): SELECT ... ORDER BY id
+  D-->>G: Fresh rows
+  G-->>B: JSON tasks; visibleTasks recalculated
   B-->>U: Box stays ticked and the filter view updates
 ```
 
@@ -1764,7 +1827,7 @@ reaches PostgreSQL.
 
 **Predict before running:** write the expected symptom in your notebook.
 
-**Expected symptom:** The list can become stale when fresh task props arrive.
+**Expected symptom:** The list can become stale when fresh tasks arrive.
 
 **Root cause:** Duplicated state has two sources that must be synchronized.
 
@@ -1782,9 +1845,9 @@ the intended invariant.
 
 #### Q1. What are event handlers and derived state?
 
-**Interview-ready answer:** A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task props plus the selected filter. Derived values should not be copied into a second state variable.
+**Interview-ready answer:** A checkbox uses onChange, a delete button uses onClick, and visible tasks are derived from task state plus the selected filter. Derived values should not be copied into a second state variable.
 
-**Example:** In `frontend/app/TaskBoard.tsx`, the checkbox calls
+**Example:** In `frontend/app/page.tsx`, the checkbox calls
 `toggleTask(task.id, event.target.checked)` and Delete calls
 `deleteTask(task.id)`. `filter` is `useState<Filter>('all')`, while
 `visibleTasks` is a plain variable computed with `tasks.filter(...)` on every
@@ -1824,15 +1887,15 @@ without holding both strings.
 
 #### Q4. How does today's work fit the complete MiniTrack system?
 
-**Interview-ready answer:** The task ID travels in the URL, the new value travels in JSON when needed, and router.refresh requests authoritative rows after mutation.
+**Interview-ready answer:** The task ID travels in the URL, the new value travels in JSON when needed, and the client requests the latest rows after mutation.
 
 **Example:** Ticking task 7 sends `PATCH /api/tasks/7` with
 `{"done":true}`; the Route Handler runs `UPDATE ... WHERE id = $2`; after 200,
-`router.refresh()` makes `page.tsx` call `listTasks()` again; `TaskBoard`
-receives new props and recalculates `visibleTasks`.
+the page increases `reloadKey`. The effect calls `GET /api/tasks`, whose
+handler calls `listTasks()`, then React recalculates `visibleTasks`.
 
 **Senior follow-up:** Each mutation costs two round trips (mutation plus
-refresh read). Measure p95 latency of `/api/tasks/[id]` and page refresh before
+GET). Measure p95 latency of `/api/tasks/[id]` and `/api/tasks` before
 adding optimistic UI or caching; also log 404 and 500 rates per route.
 
 ### 10. Complexity and operational cost
@@ -2184,8 +2247,8 @@ await fetch('/api/tasks/7', {
 }).then(response => response.status);
 ```
 
-Expect `200`. Reload the page: the new title appears because `page.tsx` reads
-it from PostgreSQL.
+Expect `200`. Reload the page: it requests the task list from the API, which
+reads the new title from PostgreSQL.
 
 Files to open deliberately:
 
@@ -2577,7 +2640,7 @@ probabilistic filter that accepts false positives.
 
 **Example:** `{"title":"   "}` is rejected with 400 by `normalizeTitle` before
 `renameTask` is called; a valid rename reaches PostgreSQL once, and the next
-`page.tsx` render shows the saved title via `listTasks()`.
+client can read the saved title through `GET /api/tasks` and update its state.
 
 **Senior follow-up:** Track 400 vs 404 vs 500 counts for `PATCH
 /api/tasks/[id]`. A spike in 400s suggests a client bug or contract change;
@@ -2617,7 +2680,7 @@ a version column would be needed to detect conflicts.
 **Everything to read today is below.** The original [App Day 7](../lessons/day-07.md)
 and [DSA Day 04](../dsa-python/lessons/dsa-day-04.md) remain available for
 comparison. This prep day adds Edit, Save, and Cancel controls to
-`TaskBoard.tsx` and uses the title-rename API built in Prep Day 03 without
+`page.tsx` and uses the title-rename API built in Prep Day 03 without
 changing it. Adding, completing, deleting, and filtering came from Prep Days
 01–02 and must keep working. Search and shareable URL filters belong to Prep
 Day 05. Write runnable code in the named project and practice files, not in
@@ -2932,7 +2995,7 @@ stateDiagram-v2
   Saving --> Editing: API failure
 ```
 
-Three new pieces of client-only state live in `TaskBoard`:
+Three new pieces of client-only state live in `page.tsx`:
 
 ```ts
 const [editingId, setEditingId] = useState<string | null>(null);
@@ -2943,7 +3006,8 @@ const editInputRef = useRef<HTMLInputElement>(null);
 - `editingId` answers **which** task is being edited (`null` means none). A
   plain `true/false` could not say which row to show as a form.
 - `editTitle` is the uncommitted draft. It is copied from `task.title` when
-  editing starts, so the user can change it without touching the `task` prop.
+  editing starts, so the user can change it without mutating the saved task
+  in React state.
 - `editInputRef` is a **ref**: a box whose `.current` React fills with the
   real `<input>` element after it appears on screen. Changing a ref does not
   re-render.
@@ -2978,7 +3042,7 @@ Accessibility rules for today:
 
 Files to open deliberately:
 
-- `frontend/app/TaskBoard.tsx`
+- `frontend/app/page.tsx`
 - `frontend/app/api/tasks/[id]/route.ts`
 
 Answer before coding:
@@ -3006,9 +3070,9 @@ The server rejects invalid or missing updates explicitly. The client should keep
 No server file changes today. The browser reuses Prep Day 03's contract in
 `frontend/app/api/tasks/[id]/route.ts`:
 
-| Browser sends | Server responds | What `TaskBoard` must do |
+| Browser sends | Server responds | What the client page must do |
 |---|---|---|
-| `{"title":"Buy oat milk"}` for an existing task | `200` + updated task | Leave edit mode; `router.refresh()` |
+| `{"title":"Buy oat milk"}` for an existing task | `200` + updated task | Leave edit mode; increase `reloadKey` to fetch the saved task |
 | `{"title":"   "}` (if the client check is bypassed) | `400` | Stay in edit mode; keep draft; show error |
 | A title for a task deleted in another tab | `404` | Stay in edit mode; keep draft; show error |
 | Any request while PostgreSQL is down | `500` | Stay in edit mode; keep draft; show error |
@@ -3028,27 +3092,59 @@ if the save fails.
 
 First try it yourself in passes, running the app after each: add the two state
 values and the Edit button, render the edit form, add the focus effect, then
-save. Then compare with this full updated `frontend/app/TaskBoard.tsx`. Code
+save. Then compare with this full updated `frontend/app/page.tsx`. Code
 from Prep Day 02 is unchanged; lines marked `NEW` are today's work.
 
 ```tsx
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react'; // NEW: useEffect, useRef
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Task } from './types';
 
 type Filter = 'all' | 'open' | 'done';
 
-export default function TaskBoard({ tasks }: { tasks: Task[] }) {
+export default function Home() {
+  // The API supplies this displayed copy; PostgreSQL stores the saved tasks.
+  const [tasks, setTasks] = useState<Task[]>([]);
+  // These states hold the add draft, chosen filter, and current edit draft.
   const [title, setTitle] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [editingId, setEditingId] = useState<string | null>(null); // NEW
   const [editTitle, setEditTitle] = useState(''); // NEW: uncommitted draft
+  // Track mutation status separately from list-loading status.
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null); // NEW
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  // Change this number to ask the effect to load the list again.
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Load on first appearance and whenever reloadKey changes.
+  useEffect(() => {
+    async function loadTasks() {
+      setLoading(true);
+      setLoadError('');
+
+      try {
+        const response = await fetch('/api/tasks', { cache: 'no-store' });
+        if (!response.ok) {
+          setLoadError(`Could not load tasks (${response.status})`);
+          setLoading(false);
+          return;
+        }
+
+        const data: Task[] = await response.json();
+        setTasks(data);
+        setLoading(false);
+      } catch {
+        setLoadError('Could not load tasks. Check your connection and try again.');
+        setLoading(false);
+      }
+    }
+
+    void loadTasks();
+  }, [reloadKey]);
 
   let visibleTasks = tasks;
   if (filter === 'open') {
@@ -3066,6 +3162,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
     }
   }, [editingId]);
 
+  // Save a new task; changing reloadKey makes the effect fetch the list again.
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanTitle = title.trim();
@@ -3090,7 +3187,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       }
 
       setTitle('');
-      router.refresh();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -3098,6 +3195,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
     }
   }
 
+  // Send the checkbox value to the API; reloadKey then fetches the saved list.
   async function toggleTask(taskId: string, done: boolean) {
     setBusy(true);
     setError('');
@@ -3114,7 +3212,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         return;
       }
 
-      router.refresh();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -3122,6 +3220,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
     }
   }
 
+  // Delete by ID, then reload so the saved list is displayed.
   async function deleteTask(taskId: string) {
     setBusy(true);
     setError('');
@@ -3134,7 +3233,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
         return;
       }
 
-      router.refresh();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -3185,7 +3284,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
 
       setEditingId(null);
       setEditTitle('');
-      router.refresh();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -3194,8 +3293,13 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
   }
 
   return (
-    <section className="mt-8">
+    // mx-auto centers the page; max-w-5xl limits width; px/py add padding.
+    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
+      <h1 className="text-4xl font-bold">MiniTrack</h1>
+      <section className="mt-8">
+      {/* flex displays controls in a row; flex-wrap allows wrapping on small screens. */}
       <form onSubmit={addTask} className="flex flex-wrap gap-3">
+        {/* sr-only hides the label visually while screen readers can still use it. */}
         <label htmlFor="task-title" className="sr-only">Task title</label>
         <input
           id="task-title"
@@ -3204,12 +3308,12 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           onChange={event => setTitle(event.target.value)}
           placeholder="What needs doing?"
           maxLength={200}
-          disabled={busy}
+          disabled={busy || loading}
         />
         <button
           type="submit"
           className="rounded-lg bg-violet-600 px-4 py-2 disabled:opacity-50"
-          disabled={busy}
+          disabled={busy || loading}
         >
           {busy ? 'Adding...' : 'Add task'}
         </button>
@@ -3229,6 +3333,19 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
       </label>
 
       {error && <p role="alert" className="mt-3 text-rose-300">{error}</p>}
+      {loading && <p role="status" className="mt-3 text-slate-400">Loading tasks...</p>}
+      {loadError && (
+        <div role="alert" className="mt-3 text-rose-300">
+          <p>{loadError}</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey(key => key + 1)}
+            disabled={loading}
+          >
+            Retry loading tasks
+          </button>
+        </div>
+      )}
       <p className="mt-4 text-slate-400">
         Showing {visibleTasks.length} of {tasks.length} tasks
       </p>
@@ -3247,7 +3364,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                 aria-label={`Complete ${task.title}`}
                 type="checkbox"
                 checked={task.done}
-                disabled={busy}
+                disabled={busy || loading}
                 onChange={event => {
                   void toggleTask(task.id, event.target.checked);
                 }}
@@ -3255,6 +3372,7 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
               {/* NEW: this row shows either the edit form or the normal view. */}
               {editingId === task.id ? (
                 <form className="flex min-w-0 flex-1 items-center gap-2" onSubmit={saveTask}>
+                  {/* flex-1 fills the row; gap-2 separates the form controls. */}
                   <label className="sr-only" htmlFor={`edit-${task.id}`}>
                     Edit {task.title}
                   </label>
@@ -3265,19 +3383,19 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                     value={editTitle}
                     onChange={event => setEditTitle(event.target.value)}
                     maxLength={200}
-                    disabled={busy}
+                    disabled={busy || loading}
                   />
                   <button
                     className="rounded-lg px-3 py-2 text-violet-300 hover:bg-slate-800"
                     type="submit"
-                    disabled={busy}
+                    disabled={busy || loading}
                   >
                     Save
                   </button>
                   <button
                     className="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-800"
                     type="button"
-                    disabled={busy}
+                    disabled={busy || loading}
                     onClick={cancelEditing}
                   >
                     Cancel
@@ -3292,14 +3410,14 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
                     <button
                       className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
                       type="button"
-                      disabled={busy}
+                      disabled={busy || loading}
                       onClick={() => startEditing(task)}
                     >
                       Edit
                     </button>
                     <button
                       className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-rose-400/10 hover:text-rose-300"
-                      disabled={busy}
+                      disabled={busy || loading}
                       type="button"
                       onClick={() => {
                         void deleteTask(task.id);
@@ -3314,25 +3432,26 @@ export default function TaskBoard({ tasks }: { tasks: Task[] }) {
           ))}
         </ul>
       )}
-    </section>
+      </section>
+    </main>
   );
 }
 ```
 
 Important decisions:
 
-- The draft is local state; the saved title is always `task.title` from
-  PostgreSQL. Never write `task.title = editTitle`: that changes nothing in the
-  database and breaks React's assumption that props are read-only.
+- The draft is local state; the task list is a copy loaded from PostgreSQL.
+  Never write `task.title = editTitle`: that changes nothing in the database
+  and mutates React state instead of updating it properly.
 - This is **not** optimistic UI: the old title stays visible in the list until
-  the server confirms and `router.refresh()` returns fresh props.
+  the server confirms and the effect reads the list again after `reloadKey`
+  changes.
 - `<>...</>` is a **fragment**: it groups two elements without adding an
   extra DOM element.
 - Starting a second edit simply replaces `editingId` and the draft; the first
   draft is discarded deliberately.
 
-`frontend/app/page.tsx`, `frontend/lib/tasks.ts`, and both Route Handlers do
-**not** change today.
+`frontend/lib/tasks.ts` and both Route Handlers do **not** change today.
 
 #### Step 2: Run and verify
 
@@ -3380,10 +3499,10 @@ failure path is explicit, and existing behavior remains intact.
 ```mermaid
 sequenceDiagram
   participant U as You
-  participant C as TaskBoard.tsx (browser)
+  participant C as page.tsx (browser)
   participant A as api/tasks/[id]/route.ts
   participant P as PostgreSQL
-  participant S as page.tsx (Server Component)
+  participant G as api/tasks/route.ts
   U->>C: Click Edit on task 7 "Buy milk"
   C->>C: startEditing: editingId "7", editTitle "Buy milk"
   C->>C: Effect runs after render: focus() and select()
@@ -3394,10 +3513,10 @@ sequenceDiagram
   P-->>A: Updated row (or no row / error)
   A-->>C: 200 task JSON (or 400 / 404 / 500)
   C->>C: On 200 clear edit state; on failure keep draft and show error
-  C->>S: router.refresh() (success only)
-  S->>P: listTasks()
-  P-->>S: Fresh rows
-  S-->>C: New tasks prop shows "Buy oat milk"
+  C->>G: GET /api/tasks (success only)
+  G->>P: listTasks()
+  P-->>G: Fresh rows
+  G-->>C: JSON updates task state
   C-->>U: Row back in viewing mode with the saved title
 ```
 
@@ -3432,7 +3551,7 @@ the intended invariant.
 
 **Interview-ready answer:** State stores which task is being edited and the draft title. A ref points to the rendered input, and an effect focuses it because focus synchronizes React with the browser DOM.
 
-**Example:** In `frontend/app/TaskBoard.tsx`, clicking Edit on task 7 sets
+**Example:** In `frontend/app/page.tsx`, clicking Edit on task 7 sets
 `editingId` to `"7"` and `editTitle` to `"Buy milk"`. The row renders an
 input with `ref={editInputRef}`, and the effect keyed on `[editingId]` calls
 `focus()` and `select()` after that input exists.
@@ -3472,8 +3591,9 @@ k trades or fees, you need a dynamic-programming state per day.
 **Interview-ready answer:** Local draft state supports interaction while PostgreSQL remains the final persisted state.
 
 **Example:** `editTitle` holds "Buy oat milk" only in the browser until
-`PATCH /api/tasks/7` returns 200. Then `router.refresh()` re-runs `page.tsx`,
-`listTasks()` reads PostgreSQL, and `TaskBoard` shows the saved title.
+`PATCH /api/tasks/7` returns 200. Then the page increases `reloadKey`, which
+makes the effect call `GET /api/tasks`; the route reads PostgreSQL and the page
+shows the saved title.
 
 **Senior follow-up:** Each save costs a PATCH plus a refresh read. If users
 find saving slow, measure that latency first; optimistic UI could show the new
@@ -3557,7 +3677,7 @@ Do not copy the source paragraph. Write what you remember, then compare.
 
 **Backend focus — Reading and normalizing search parameters:** The server treats query parameters as untrusted strings, normalizes allowed values, and passes a typed filter to the data function.
 
-**Today's connection:** The URL becomes the input to server rendering, so navigation and data selection describe the same state.
+**Today's connection:** The client sends the URL filters to the API, so navigation and data selection describe the same state.
 
 ```mermaid
 flowchart LR
@@ -3835,7 +3955,7 @@ Compare the two kinds of state already in MiniTrack:
 
 | Value | Where it lives | Survives reload? | Shareable? |
 |---|---|---|---|
-| `title` draft in `TaskBoard` | React `useState` | No | No |
+| `title` draft in `page.tsx` | React `useState` | No | No |
 | `editingId` and `editTitle` (Prep Day 04) | React `useState` | No | No |
 | Day 5 `filter` in the **Show** select | React `useState` | No | No |
 | `q` and `status` after today | URL: `/?q=react&status=open` | Yes | Yes |
@@ -3856,20 +3976,20 @@ Today's URL contract is:
 ```mermaid
 flowchart TD
   A["1. User submits search form"] --> B["2. Browser navigates with ?q=&status="]
-  B --> C["3. Next.js provides searchParams"]
-  C --> D["4. Validate and normalize values"]
+  B --> C["3. Client page requests /api/tasks with the URL query"]
+  C --> D["4. API validates and normalizes values"]
   D --> E["5. Build bound PostgreSQL query"]
   E --> F["6. PostgreSQL filters rows"]
-  F --> G["7. Server Component renders results"]
+  F --> G["7. Client displays returned results"]
 ```
 
 The form uses `method="GET"`. When a GET form is submitted, the browser
 itself turns each named field into the query string: `name="q"` becomes `q=`
-and `name="status"` becomes `status=`. No JavaScript, `useState`, or `fetch`
-is needed, so there are no debounce timers or out-of-order responses yet.
+and `name="status"` becomes `status=`. The form causes a normal browser
+navigation; after it loads, the client page fetches the filtered results.
 
-Create `frontend/app/SearchForm.tsx`. It has no `'use client'`, so it is a
-Server Component:
+Create `frontend/app/SearchForm.tsx`. Because the Client Component imports it,
+it becomes part of the client component tree:
 
 ```tsx
 import type { TaskFilters } from '../lib/validation';
@@ -3877,11 +3997,13 @@ import type { TaskFilters } from '../lib/validation';
 export default function SearchForm({ filters }: { filters: TaskFilters }) {
   return (
     // method="GET" puts the field values in the URL: /?q=...&status=...
+    // grid arranges controls; gap adds spacing; sm: changes columns on wider screens.
     <form
       className="my-6 grid gap-3 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:grid-cols-[1fr_auto_auto]"
       method="GET"
     >
       <label>
+        {/* sr-only keeps the label available to screen readers without showing it. */}
         <span className="sr-only">Search task titles</span>
         <input
           className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3"
@@ -3924,7 +4046,7 @@ rule from the What section.
 Files to open deliberately:
 
 - `frontend/app/page.tsx`
-- `frontend/app/TaskBoard.tsx`
+- `frontend/app/api/tasks/route.ts`
 - `frontend/lib/tasks.ts`
 
 Answer before coding:
@@ -3934,10 +4056,8 @@ Answer before coding:
 - What should the user see while work is pending?
 - What should remain unchanged when the operation fails?
 
-**Leave `TaskBoard.tsx` unchanged today.** It still has the Day 5 **Show**
-select (`useState<Filter>`). That select only narrows the list the server has
-already filtered, and it is lost on reload. Keep it for now as the contrast in
-today's debugging exercise.
+Remove the old local **Show** filter as described below, so there is only one
+applied status filter: the one in the URL.
 
 ### 5. Backend guided study (1 hour 30 minutes)
 
@@ -4015,7 +4135,7 @@ is valid.
 | `/` | `{ query: '', status: 'all' }` |
 | `/?q=%20%20React%20%20&status=open` | `{ query: 'React', status: 'open' }` |
 | `/?status=banana` | `{ query: '', status: 'all' }` |
-| `/?q=a&q=b` | `{ query: '', status: 'all' }` (array is not a string) |
+| `/?q=a&q=b` | `{ query: 'a', status: 'all' }` (`URLSearchParams.get` reads the first value) |
 
 #### Step 2: Add a first filtered query
 
@@ -4069,94 +4189,120 @@ quote such as `Bob's task` is data, not SQL syntax.
 
 **Milestone source:** Day 8 URL-backed search and status filters
 
-1. Read searchParams in the Server Component.
-2. Build a form or navigation update that writes q and status to the URL.
+1. Make the GET API normalize filters and query PostgreSQL.
+2. Read the URL in the client and send its query string to the API.
 3. Verify reload and copied URLs preserve the result.
 
-#### Step 1: Read searchParams in the page
+#### Step 1: Update the GET API
 
-Next.js gives a page its query string as `searchParams`, which is a
-**Promise**. Awaiting it inside the `Suspense` subtree makes only that part
-request-specific, so the header stays in the static shell. You do not need
-`io()` in this component: awaiting `searchParams` already marks it as
-request-time. Do not add `dynamic = 'force-dynamic'`.
+In `frontend/app/api/tasks/route.ts`, keep the existing POST handler. Replace
+the imports and GET handler with these; the relative paths start three
+directories below `frontend/`:
 
-Replace `frontend/app/page.tsx` with:
+```ts
+import type { NextRequest } from 'next/server';
+import { createTask, searchTasks } from '../../../lib/tasks';
+import { isRecord, normalizeTaskFilters, normalizeTitle } from '../../../lib/validation';
 
-```tsx
-import { Suspense } from 'react';
-import SearchForm from './SearchForm';
-import TaskBoard from './TaskBoard';
-import { searchTasks } from '../lib/tasks';
-import { normalizeTaskFilters } from '../lib/validation';
-import type { Task } from './types';
-
-type PageProps = {
-  searchParams: Promise<{
-    q?: string;
-    status?: string;
-  }>;
-};
-
-async function TaskResults({ searchParams }: PageProps) {
-  // Awaiting searchParams makes this subtree request-specific.
-  const params = await searchParams;
-  const filters = normalizeTaskFilters(params.q, params.status);
-
-  let tasks: Task[] = [];
-  let error: string | null = null;
+export async function GET(request: NextRequest): Promise<Response> {
+  // The server checks untrusted URL values before using them in the query.
+  const filters = normalizeTaskFilters(
+    request.nextUrl.searchParams.get('q'),
+    request.nextUrl.searchParams.get('status'),
+  );
   try {
-    tasks = await searchTasks(filters);
-  } catch (err) {
-    error = err instanceof Error ? err.message : 'Unable to load tasks';
+    return Response.json(await searchTasks(filters), {
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  } catch (error: unknown) {
+    console.error('GET /api/tasks failed:', error);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
-
-  return (
-    <>
-      {/* The form shows the same filters the URL and SQL used. */}
-      <SearchForm filters={filters} />
-      {error ? (
-        <p
-          className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200"
-          role="alert"
-        >
-          Could not load tasks: {error}. Check PostgreSQL and DATABASE_URL.
-        </p>
-      ) : (
-        <TaskBoard tasks={tasks} />
-      )}
-    </>
-  );
-}
-
-export default function Home({ searchParams }: PageProps) {
-  return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
-      <header className="mb-8">
-        <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">
-          Your workspace
-        </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight">MiniTrack</h1>
-        <p className="mt-2 text-slate-400">
-          Simple tasks. Serious full-stack concepts.
-        </p>
-      </header>
-
-      <Suspense fallback={<p className="mt-8 text-slate-400">Filtering tasks...</p>}>
-        <TaskResults searchParams={searchParams} />
-      </Suspense>
-    </main>
-  );
 }
 ```
 
-`Home` is not `async`; it passes the unresolved Promise down. `TaskResults`
-awaits it, normalizes once, and uses the same `filters` for both the SQL call
-and the form's default values, so the screen and the URL cannot disagree.
-`listTasks` is no longer used by the page; keep it in `tasks.ts` because
-`GET /api/tasks` still uses it until Prep Day 06.
+#### Step 2: Connect the client page
 
-#### Step 2: Run and verify
+Continue editing `frontend/app/page.tsx` from Prep Day 04; do not replace it
+with a Server Component. Add these imports:
+
+```tsx
+import SearchForm from './SearchForm';
+import { normalizeTaskFilters } from '../lib/validation';
+```
+
+Near the existing state declarations, add a state value for the applied URL
+filters and a reload counter. The filters start with safe defaults because
+browser globals are not available during server rendering:
+
+```tsx
+// The URL is the source of truth for the applied search and status.
+const [filters, setFilters] = useState(() => normalizeTaskFilters('', 'all'));
+// Increase this after a successful change to fetch the list again.
+const [reloadKey, setReloadKey] = useState(0);
+```
+
+Use this effect to read the current URL and fetch its matching tasks. The URL
+search string is included in the GET request:
+
+```tsx
+useEffect(() => {
+  async function loadTasks() {
+    setLoading(true);
+    setLoadError('');
+
+    try {
+      // The URL carries the selected search and status filters.
+      const response = await fetch(`/api/tasks${window.location.search}`, {
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        setLoadError(`Could not load tasks (${response.status})`);
+        setLoading(false);
+        return;
+      }
+
+      const data: Task[] = await response.json();
+      setTasks(data);
+      setLoading(false);
+    } catch {
+      setLoadError('Could not load tasks. Check your connection and try again.');
+      setLoading(false);
+    }
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  setFilters(normalizeTaskFilters(params.get('q'), params.get('status')));
+  void loadTasks();
+}, [reloadKey]);
+```
+
+Remove `type Filter`, the `filter` state, its derived `visibleTasks` block,
+and the local **Show** label and select. Replace the derived block with:
+
+```tsx
+// The API has already filtered the list for the current URL.
+const visibleTasks = tasks;
+```
+
+In the page JSX, put the following immediately after the `<h1>`. The key
+recreates the uncontrolled form after the URL values are read, so its
+`defaultValue` fields show those values:
+
+```tsx
+<SearchForm key={JSON.stringify(filters)} filters={filters} />
+```
+
+Keep the add/edit form and its request handlers. Replace the count
+with `Showing {visibleTasks.length} tasks`, since the response does not contain
+the unfiltered total. Use `No tasks match these filters.` for the empty state.
+
+The form navigates to a new URL; the effect runs after the new page appears.
+After a successful mutation, use `setReloadKey(key => key + 1)` so the effect
+fetches the matching list again. This uses the same simple pattern as earlier
+days without needing `useCallback`, `useRef`, or request-cancellation code.
+
+#### Step 3: Run and verify
 
 With PostgreSQL running and `frontend/.env.local` configured, from the
 repository root:
@@ -4180,7 +4326,7 @@ Add tasks such as `Learn React`, `Review SQL`, and `React testing`, then mark
 5. Visit `/?status=banana`. The select shows **All** and all tasks appear.
 6. Visit `/?q=zzzz`. The board shows its empty message.
 7. Add, complete, edit, and delete a task while a filter is applied; each
-   still works and the list refreshes through `router.refresh()`.
+   still works and the list is reloaded through `GET /api/tasks`.
 
 **Expected observation:** the user-visible milestone works, its important
 failure path is explicit, and existing behavior remains intact.
@@ -4190,9 +4336,8 @@ failure path is explicit, and existing behavior remains intact.
 - Stop PostgreSQL and reload: the page shows the `role="alert"` message, not
   an empty list that looks like "no matches". Restart PostgreSQL afterwards.
 - If the URL changes but results do not, confirm the inputs have `name="q"`
-  and `name="status"` and that `TaskResults` passes `filters` to `searchTasks`.
-- If TypeScript reports that `searchParams` is not a Promise, check the
-  `PageProps` type and that you `await` it.
+  and `name="status"`, the page includes `window.location.search` in its GET,
+  and the API passes normalized filters to `searchTasks`.
 
 **Known gap for Prep Day 06:** searching for `%` currently matches every
 title because `%` is still a wildcard. That is a search-semantics bug, not
@@ -4204,17 +4349,19 @@ SQL injection: the value is bound.
 sequenceDiagram
   participant U as User
   participant B as Browser
-  participant N as Next.js page.tsx
+  participant N as Client page.tsx
+  participant A as GET /api/tasks
   participant V as normalizeTaskFilters
   participant P as PostgreSQL
   U->>B: Type react, choose Open, press Apply
-  B->>N: GET /?q=react&status=open
-  N->>N: Send static header and Suspense fallback
-  N->>V: params.q = "react", params.status = "open"
-  V-->>N: { query: "react", status: "open" }
-  N->>P: SELECT ... ILIKE $1 ... with ["%react%", "open"]
-  P-->>N: Matching open rows, or an error
-  N-->>B: Stream SearchForm + TaskBoard, or alert
+  B->>N: Navigate to /?q=react&status=open
+  N->>A: GET /api/tasks?q=react&status=open
+  A->>V: q = "react", status = "open"
+  V-->>A: { query: "react", status: "open" }
+  A->>P: SELECT ... ILIKE $1 ... with ["%react%", "open"]
+  P-->>A: Matching open rows, or an error
+  A-->>N: JSON tasks or error response
+  N-->>B: Render results or alert
   B-->>U: URL, form, and list show the same filters
 ```
 
@@ -4224,9 +4371,8 @@ Trace one concrete input. Name every boundary, value, and possible failure.
 
 **Break it:** Keep the active filter only in component state.
 
-You do not need to write new code: the Day 5 **Show** select in `TaskBoard`
-is exactly this design. Choose **Done** in that select (not in the search
-form), copy the URL, and reload.
+Imagine storing the chosen status only in React state rather than submitting
+it in the URL. Write down what happens when you copy the URL and reload.
 
 **Predict before running:** write the expected symptom in your notebook.
 
@@ -4235,7 +4381,7 @@ form), copy the URL, and reload.
 **Root cause:** Local state is not a durable navigation representation.
 
 **Restore and verify:** Move committed filter state into search parameters.
-Use the search form's **Status** select instead, reload, and confirm
+Use the search form's **Status** select, reload, and confirm
 `status=done` survives in the URL and on screen.
 
 Do not stop after making the symptom disappear. Explain why the repair restores
@@ -4250,7 +4396,7 @@ the intended invariant.
 **Example:** In `frontend/app/SearchForm.tsx`, the search input uses
 `defaultValue={filters.query}`, so typing is a local browser draft. Pressing
 **Apply** submits the GET form and the URL becomes `/?q=react&status=open`.
-In contrast, `TaskBoard`'s `title` and `editTitle` are `useState` drafts that
+In contrast, the client page's `title` and `editTitle` are `useState` drafts that
 should never appear in the URL.
 
 **Senior follow-up:** URL state becomes hard to maintain when there are many
@@ -4263,7 +4409,7 @@ and cancellation while still writing the committed value to the URL.
 
 **Interview-ready answer:** The server treats query parameters as untrusted strings, normalizes allowed values, and passes a typed filter to the data function.
 
-**Example:** `normalizeTaskFilters(params.q, params.status)` turns
+**Example:** `normalizeTaskFilters(params.get('q'), params.get('status'))` turns
 `/?q=  React  &status=banana` into `{ query: 'React', status: 'all' }`.
 `searchTasks(filters)` then binds `'%React%'` and `'all'` as `$1` and `$2`.
 
@@ -4287,12 +4433,12 @@ only be read forwards, two pointers no longer apply directly.
 
 #### Q4. How does today's work fit the complete MiniTrack system?
 
-**Interview-ready answer:** The URL becomes the input to server rendering, so navigation and data selection describe the same state.
+**Interview-ready answer:** The client sends the URL filters to the API, which validates them and reads matching data. Navigation and data selection describe the same state.
 
-**Example:** Applying the form sends `GET /?q=react&status=open`. The page
-awaits `searchParams`, normalizes it, runs one parameterized `SELECT`, and
-streams `SearchForm` plus `TaskBoard`. A colleague opening the same URL gets
-the same view.
+**Example:** Applying the form opens `/?q=react&status=open`. The client
+requests `/api/tasks?q=react&status=open`, and the API normalizes the
+parameters and runs one parameterized `SELECT`. A colleague opening the same
+URL gets the same view.
 
 **Senior follow-up:** The first bottleneck to measure is the `%react%`
 `ILIKE` query, which can scan every row. Check it with `EXPLAIN` on realistic
@@ -4647,29 +4793,28 @@ This table maps each state to the exact code that renders it:
 
 | State | Trigger | Where it is rendered | What the user sees |
 |---|---|---|---|
-| Pending | `TaskResults` is awaiting `searchParams` or `searchTasks` | `<Suspense fallback={...}>` in `frontend/app/page.tsx` | `Filtering tasks...` |
-| Empty | Query succeeded with zero rows | `visibleTasks.length === 0` branch in `frontend/app/TaskBoard.tsx` | `No tasks in this filter.` plus the search form |
-| Invalid input | `?status=banana`, `?q=a&q=b`, or a very long `q` | `normalizeTaskFilters` in `frontend/lib/validation.ts` | Safe defaults (`All`, empty search); no error |
-| Server failure | PostgreSQL is down or the query throws | `catch` in `TaskResults` | Red `role="alert"` box: `Could not load tasks: ...` |
-| Success | Rows returned | `TaskBoard` list | Matching tasks; form shows applied filters |
+| Pending | The GET request is in flight | `loading` in `frontend/app/page.tsx` | `Loading tasks...` |
+| Empty | Query succeeded with zero rows | `visibleTasks.length === 0` in `frontend/app/page.tsx` | `No tasks match these filters.` plus the search form |
+| Invalid input | `?status=banana` or a very long `q` | `normalizeTaskFilters` in `frontend/lib/validation.ts` | Safe defaults (`All`, shortened search); no error |
+| Server failure | PostgreSQL is down or the query throws | `loadError` in the client page | `role="alert"` and a retry button |
+| Success | Rows returned | Client page list | Matching tasks; form shows applied filters |
 
 Two details are worth saying aloud:
 
-- The search form is rendered **inside** the success and error branches, so
-  the user can always change the search even when results fail.
+- The search form remains visible when loading fails, so the user can change
+  the search or retry.
 - Normalization is a policy choice. MiniTrack silently falls back for the
   page. The JSON API below uses the same policy, so the page and API never
   disagree.
 
 Because `SearchForm` is a plain `method="GET"` form, submitting it performs a
-normal browser navigation. The server sends the static header and the
-`Filtering tasks...` fallback first, then streams the results. On a fast local
-database the fallback may only flash; the next step makes it visible.
+normal browser navigation. The client then fetches the filtered list and shows
+`Loading tasks...` until the request finishes.
 
 Files to open deliberately:
 
 - `frontend/app/page.tsx`
-- `frontend/app/TaskBoard.tsx`
+- `frontend/app/api/tasks/route.ts`
 - `frontend/lib/tasks.ts`
 
 Answer before coding:
@@ -4780,8 +4925,9 @@ layer. The values are still bound; the SQL structure is still fixed.
 
 #### Step 2: Filter the JSON API with the same rules
 
-Replace `frontend/app/api/tasks/route.ts` with this complete file. `POST` is
-unchanged from Prep Day 01; `GET` now reads the query string:
+Compare `frontend/app/api/tasks/route.ts` with this complete file. Both
+handlers are unchanged from Prep Day 05; the updated `searchTasks` function
+now applies literal wildcard escaping:
 
 ```ts
 import type { NextRequest } from 'next/server';
@@ -4890,12 +5036,10 @@ failure path is explicit, and existing behavior remains intact.
   `{"error":"Internal server error"}` — no SQL text or password in the body.
   The detailed error appears only in the `npm run dev` terminal. Restart
   PostgreSQL.
-- **Empty state:** `/?q=zzzz` shows `No tasks in this filter.`, not a blank
+- **Empty state:** `/?q=zzzz` shows `No tasks match these filters.`, not a blank
   page or an error.
-- **Pending state:** to see the fallback clearly, temporarily add
-  `await new Promise(resolve => setTimeout(resolve, 2000));` as the first line
-  of `TaskResults`, reload, observe `Filtering tasks...`, then **remove the
-  delay**.
+- **Pending state:** use the browser Network panel to throttle the connection,
+  reload, and observe `Loading tasks...`; then restore normal network speed.
 - **Cost check:** a leading `%` usually prevents a normal B-tree index from
   helping. Inspect the plan in `psql`:
 
@@ -4961,11 +5105,10 @@ the intended invariant.
 
 **Interview-ready answer:** A complete search experience distinguishes pending work, zero matching records, validation failures, and server failures instead of showing an unexplained blank list.
 
-**Example:** In MiniTrack, `/?q=react` first shows the `Suspense` fallback
-`Filtering tasks...`; `/?q=zzzz` shows `No tasks in this filter.` from
-`TaskBoard.tsx`; `/?status=banana` falls back to **All**; and a stopped
-database shows the `role="alert"` message from the `catch` in
-`TaskResults`, with the search form still usable.
+**Example:** In MiniTrack, `/?q=react` shows `Loading tasks...` while the
+client requests the list; `/?q=zzzz` shows `No tasks match these filters.`;
+`/?status=banana` falls back to **All**; and a stopped database shows an
+alert and retry button with the search form still usable.
 
 **Senior follow-up:** These states get harder with live (debounced) search:
 you need to cancel or ignore stale responses, avoid flashing the fallback on
@@ -5365,7 +5508,7 @@ breaks it. If it checks behavior, it only breaks when users would notice.
 #### How
 
 Look at what a user (or screen reader) can actually find in
-`frontend/app/TaskBoard.tsx` and `frontend/app/SearchForm.tsx`:
+`frontend/app/page.tsx` and `frontend/app/SearchForm.tsx`:
 
 | User-visible handle | Where it comes from |
 |---|---|
@@ -5662,7 +5805,7 @@ the intended invariant.
 
 **Interview-ready answer:** A frontend test should interact through labels, roles, text, and user actions, then assert what a user can observe. Internal state names are implementation details.
 
-**Example:** For `frontend/app/TaskBoard.tsx`, a good check is "the
+**Example:** For `frontend/app/page.tsx`, a good check is "the
 checkbox labelled **Complete Learn React** is still checked after reload", not
 "`toggleTask` was called" or "`busy` became `true`". In today's
 `frontend/test/unit/validation.test.ts`, the same idea means asserting
@@ -6089,7 +6232,7 @@ types like a user, and checks what appears on the page. An **E2E** (end-to-end)
 test uses the whole stack: browser → Next.js → PostgreSQL.
 
 Playwright finds elements by their **accessible name**, the same label a screen
-reader announces. Today's test relies on two names that `frontend/app/TaskBoard.tsx`
+reader announces. Today's test relies on two names that `frontend/app/page.tsx`
 already provides from Prep Day 02:
 
 ```tsx
@@ -6432,16 +6575,20 @@ sequenceDiagram
   T->>D: TRUNCATE tasks RESTART IDENTITY
   T->>B: page.goto('/')
   B->>N: GET /
+  B->>N: GET /api/tasks
   N->>D: SELECT tasks (none)
   T->>B: fill "Practice testing" and click Add task
   B->>N: POST /api/tasks {"title":"Practice testing"}
   N->>D: INSERT ... RETURNING (id 1)
-  N-->>B: 201, then router.refresh()
+  N-->>B: 201 Created
+  B->>N: GET /api/tasks after success
+  N->>D: SELECT tasks
   T->>B: check "Complete Practice testing"
   B->>N: PATCH /api/tasks/1 {"done":true}
   N->>D: UPDATE tasks SET done = true WHERE id = 1
   T->>B: page.reload()
   B->>N: GET /
+  B->>N: GET /api/tasks
   N->>D: SELECT tasks (done = true)
   T->>B: expect checkbox toBeChecked
 ```
@@ -6524,7 +6671,7 @@ use prefix sums with a monotonic deque instead.
 **Interview-ready answer:** Unit, database, and browser tests cover different boundaries without asking one expensive test to prove everything.
 
 **Example:** A blank title is caught by the `normalizeTitle` unit test; the
-rename SQL is caught by the integration test; a missing `router.refresh()` or
+rename SQL is caught by the integration test; a missing `loadTasks()` call or
 a broken checkbox label is caught only by the Playwright journey.
 
 **Senior follow-up:** Before adding more infrastructure, measure total suite
@@ -6553,6 +6700,10 @@ the first security risk is a test configuration that can reach real data.
 <a id="prep-day-09"></a>
 
 ## Prep Day 09 — Add authentication and client session Context
+
+> **Architecture transition:** This lesson still uses server-rendered task
+> data and has not yet been adapted to the client-fetch page from Prep Days
+> 01–08. Its page code cannot be applied directly without further changes.
 
 **Date:** Friday, December 4, 2026
 **Time:** 7 study hours plus breaks

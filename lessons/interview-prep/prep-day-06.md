@@ -324,29 +324,28 @@ This table maps each state to the exact code that renders it:
 
 | State | Trigger | Where it is rendered | What the user sees |
 |---|---|---|---|
-| Pending | `TaskResults` is awaiting `searchParams` or `searchTasks` | `<Suspense fallback={...}>` in `frontend/app/page.tsx` | `Filtering tasks...` |
-| Empty | Query succeeded with zero rows | `visibleTasks.length === 0` branch in `frontend/app/TaskBoard.tsx` | `No tasks in this filter.` plus the search form |
-| Invalid input | `?status=banana`, `?q=a&q=b`, or a very long `q` | `normalizeTaskFilters` in `frontend/lib/validation.ts` | Safe defaults (`All`, empty search); no error |
-| Server failure | PostgreSQL is down or the query throws | `catch` in `TaskResults` | Red `role="alert"` box: `Could not load tasks: ...` |
-| Success | Rows returned | `TaskBoard` list | Matching tasks; form shows applied filters |
+| Pending | The GET request is in flight | `loading` in `frontend/app/page.tsx` | `Loading tasks...` |
+| Empty | Query succeeded with zero rows | `visibleTasks.length === 0` in `frontend/app/page.tsx` | `No tasks match these filters.` plus the search form |
+| Invalid input | `?status=banana` or a very long `q` | `normalizeTaskFilters` in `frontend/lib/validation.ts` | Safe defaults (`All`, shortened search); no error |
+| Server failure | PostgreSQL is down or the query throws | `loadError` in the client page | `role="alert"` and a retry button |
+| Success | Rows returned | Client page list | Matching tasks; form shows applied filters |
 
 Two details are worth saying aloud:
 
-- The search form is rendered **inside** the success and error branches, so
-  the user can always change the search even when results fail.
+- The search form remains visible when loading fails, so the user can change
+  the search or retry.
 - Normalization is a policy choice. MiniTrack silently falls back for the
   page. The JSON API below uses the same policy, so the page and API never
   disagree.
 
 Because `SearchForm` is a plain `method="GET"` form, submitting it performs a
-normal browser navigation. The server sends the static header and the
-`Filtering tasks...` fallback first, then streams the results. On a fast local
-database the fallback may only flash; the next step makes it visible.
+normal browser navigation. The client then fetches the filtered list and shows
+`Loading tasks...` until the request finishes.
 
 Files to open deliberately:
 
 - `frontend/app/page.tsx`
-- `frontend/app/TaskBoard.tsx`
+- `frontend/app/api/tasks/route.ts`
 - `frontend/lib/tasks.ts`
 
 Answer before coding:
@@ -457,8 +456,9 @@ layer. The values are still bound; the SQL structure is still fixed.
 
 ### Step 2: Filter the JSON API with the same rules
 
-Replace `frontend/app/api/tasks/route.ts` with this complete file. `POST` is
-unchanged from Prep Day 01; `GET` now reads the query string:
+Compare `frontend/app/api/tasks/route.ts` with this complete file. Both
+handlers are unchanged from Prep Day 05; the updated `searchTasks` function
+now applies literal wildcard escaping:
 
 ```ts
 import type { NextRequest } from 'next/server';
@@ -567,12 +567,10 @@ failure path is explicit, and existing behavior remains intact.
   `{"error":"Internal server error"}` — no SQL text or password in the body.
   The detailed error appears only in the `npm run dev` terminal. Restart
   PostgreSQL.
-- **Empty state:** `/?q=zzzz` shows `No tasks in this filter.`, not a blank
+- **Empty state:** `/?q=zzzz` shows `No tasks match these filters.`, not a blank
   page or an error.
-- **Pending state:** to see the fallback clearly, temporarily add
-  `await new Promise(resolve => setTimeout(resolve, 2000));` as the first line
-  of `TaskResults`, reload, observe `Filtering tasks...`, then **remove the
-  delay**.
+- **Pending state:** use the browser Network panel to throttle the connection,
+  reload, and observe `Loading tasks...`; then restore normal network speed.
 - **Cost check:** a leading `%` usually prevents a normal B-tree index from
   helping. Inspect the plan in `psql`:
 
@@ -638,11 +636,10 @@ the intended invariant.
 
 **Interview-ready answer:** A complete search experience distinguishes pending work, zero matching records, validation failures, and server failures instead of showing an unexplained blank list.
 
-**Example:** In MiniTrack, `/?q=react` first shows the `Suspense` fallback
-`Filtering tasks...`; `/?q=zzzz` shows `No tasks in this filter.` from
-`TaskBoard.tsx`; `/?status=banana` falls back to **All**; and a stopped
-database shows the `role="alert"` message from the `catch` in
-`TaskResults`, with the search form still usable.
+**Example:** In MiniTrack, `/?q=react` shows `Loading tasks...` while the
+client requests the list; `/?q=zzzz` shows `No tasks match these filters.`;
+`/?status=banana` falls back to **All**; and a stopped database shows an
+alert and retry button with the search form still usable.
 
 **Senior follow-up:** These states get harder with live (debounced) search:
 you need to cancel or ignore stale responses, avoid flashing the fallback on

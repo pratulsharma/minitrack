@@ -402,7 +402,7 @@ No server file changes today. The browser reuses Prep Day 03's contract in
 
 | Browser sends | Server responds | What the client page must do |
 |---|---|---|
-| `{"title":"Buy oat milk"}` for an existing task | `200` + updated task | Leave edit mode; call `loadTasks()` |
+| `{"title":"Buy oat milk"}` for an existing task | `200` + updated task | Leave edit mode; increase `reloadKey` to fetch the saved task |
 | `{"title":"   "}` (if the client check is bypassed) | `400` | Stay in edit mode; keep draft; show error |
 | A title for a task deleted in another tab | `404` | Stay in edit mode; keep draft; show error |
 | Any request while PostgreSQL is down | `500` | Stay in edit mode; keep draft; show error |
@@ -428,7 +428,7 @@ from Prep Day 02 is unchanged; lines marked `NEW` are today's work.
 ```tsx
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Task } from './types';
 
 type Filter = 'all' | 'open' | 'done';
@@ -447,43 +447,34 @@ export default function Home() {
   const editInputRef = useRef<HTMLInputElement>(null); // NEW
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const currentLoad = useRef<AbortController | null>(null);
+  // Change this number to ask the effect to load the list again.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // GET the latest list; cancel an older request before starting a new one.
-  const loadTasks = useCallback(async () => {
-    currentLoad.current?.abort();
-    const controller = new AbortController();
-    currentLoad.current = controller;
-    setLoading(true);
-    setLoadError('');
-
-    try {
-      const response = await fetch('/api/tasks', {
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-      if (!response.ok) {
-        setLoadError(`Could not load tasks (${response.status})`);
-        setLoading(false);
-        return;
-      }
-
-      const data: Task[] = await response.json();
-      if (controller.signal.aborted) return;
-      setTasks(data);
-      setLoading(false);
-    } catch {
-      if (controller.signal.aborted) return;
-      setLoadError('Could not load tasks. Check your connection and try again.');
-      setLoading(false);
-    }
-  }, []);
-
+  // Load on first appearance and whenever reloadKey changes.
   useEffect(() => {
+    async function loadTasks() {
+      setLoading(true);
+      setLoadError('');
+
+      try {
+        const response = await fetch('/api/tasks', { cache: 'no-store' });
+        if (!response.ok) {
+          setLoadError(`Could not load tasks (${response.status})`);
+          setLoading(false);
+          return;
+        }
+
+        const data: Task[] = await response.json();
+        setTasks(data);
+        setLoading(false);
+      } catch {
+        setLoadError('Could not load tasks. Check your connection and try again.');
+        setLoading(false);
+      }
+    }
+
     void loadTasks();
-    return () => currentLoad.current?.abort();
-  }, [loadTasks]);
+  }, [reloadKey]);
 
   let visibleTasks = tasks;
   if (filter === 'open') {
@@ -501,7 +492,7 @@ export default function Home() {
     }
   }, [editingId]);
 
-  // Save a new task, then reload the list from the API.
+  // Save a new task; changing reloadKey makes the effect fetch the list again.
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanTitle = title.trim();
@@ -526,7 +517,7 @@ export default function Home() {
       }
 
       setTitle('');
-      await loadTasks();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -534,7 +525,7 @@ export default function Home() {
     }
   }
 
-  // Send the checkbox value to the API; do not mutate the task locally.
+  // Send the checkbox value to the API; reloadKey then fetches the saved list.
   async function toggleTask(taskId: string, done: boolean) {
     setBusy(true);
     setError('');
@@ -551,7 +542,7 @@ export default function Home() {
         return;
       }
 
-      await loadTasks();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -572,7 +563,7 @@ export default function Home() {
         return;
       }
 
-      await loadTasks();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -623,7 +614,7 @@ export default function Home() {
 
       setEditingId(null);
       setEditTitle('');
-      await loadTasks();
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -676,7 +667,11 @@ export default function Home() {
       {loadError && (
         <div role="alert" className="mt-3 text-rose-300">
           <p>{loadError}</p>
-          <button type="button" onClick={() => void loadTasks()} disabled={loading}>
+          <button
+            type="button"
+            onClick={() => setReloadKey(key => key + 1)}
+            disabled={loading}
+          >
             Retry loading tasks
           </button>
         </div>
@@ -779,7 +774,8 @@ Important decisions:
   Never write `task.title = editTitle`: that changes nothing in the database
   and mutates React state instead of updating it properly.
 - This is **not** optimistic UI: the old title stays visible in the list until
-  the server confirms and `loadTasks()` reads the list again.
+  the server confirms and the effect reads the list again after `reloadKey`
+  changes.
 - `<>...</>` is a **fragment**: it groups two elements without adding an
   extra DOM element.
 - Starting a second edit simply replaces `editingId` and the draft; the first
@@ -925,8 +921,9 @@ k trades or fees, you need a dynamic-programming state per day.
 **Interview-ready answer:** Local draft state supports interaction while PostgreSQL remains the final persisted state.
 
 **Example:** `editTitle` holds "Buy oat milk" only in the browser until
-`PATCH /api/tasks/7` returns 200. Then `loadTasks()` calls `GET /api/tasks`,
-the route reads PostgreSQL, and the page shows the saved title.
+`PATCH /api/tasks/7` returns 200. Then the page increases `reloadKey`, which
+makes the effect call `GET /api/tasks`; the route reads PostgreSQL and the page
+shows the saved title.
 
 **Senior follow-up:** Each save costs a PATCH plus a refresh read. If users
 find saving slow, measure that latency first; optimistic UI could show the new

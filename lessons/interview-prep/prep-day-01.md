@@ -14,10 +14,10 @@ filtering belong to Prep Day 02. Write runnable code in the named project and
 practice files, not in this Markdown file.
 
 **Transition note:** This day now uses a Client Component and `GET /api/tasks`
-to load tasks. Prep Days 02–04 continue this approach. Prep Days 05–25 still
-use the earlier Server Component and `router.refresh()` approach and have not
-yet been converted; their replacement code is not compatible with this page
-without further changes.
+to load tasks. Prep Days 02–08 continue this approach. Prep Days 09–25 have
+not yet been fully converted from the earlier Server Component and
+`router.refresh()` approach; their instructions may not be compatible with
+this page without further changes.
 
 ## Learning objectives
 
@@ -413,7 +413,7 @@ the input to React state, and send a POST request. Then replace
 ```tsx
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { Task } from './types';
 
 export default function Home() {
@@ -428,45 +428,34 @@ export default function Home() {
   // The list has its own status because GET can fail even after POST succeeds.
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  // Remember the active GET so an older response cannot replace a newer list.
-  const currentLoad = useRef<AbortController | null>(null);
+  // Increase this after a successful save to make the effect load the list again.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // Load the current task list from the API, not directly from PostgreSQL.
-  const loadTasks = useCallback(async () => {
-    currentLoad.current?.abort();
-    const controller = new AbortController();
-    currentLoad.current = controller;
-    setLoading(true);
-    setLoadError('');
-
-    try {
-      const response = await fetch('/api/tasks', {
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-      if (!response.ok) {
-        setLoadError(`Could not load tasks (${response.status})`);
-        setLoading(false);
-        return;
-      }
-
-      const data: Task[] = await response.json();
-      if (controller.signal.aborted) return;
-      setTasks(data);
-      setLoading(false);
-    } catch {
-      if (controller.signal.aborted) return;
-      setLoadError('Could not load tasks. Check your connection and try again.');
-      setLoading(false);
-    }
-  }, []);
-
-  // Load on mount and cancel the outstanding request when leaving the page.
+  // Load the list when the page first appears and whenever reloadKey changes.
   useEffect(() => {
+    async function loadTasks() {
+      setLoading(true);
+      setLoadError('');
+
+      try {
+        const response = await fetch('/api/tasks', { cache: 'no-store' });
+        if (!response.ok) {
+          setLoadError(`Could not load tasks (${response.status})`);
+          setLoading(false);
+          return;
+        }
+
+        const data: Task[] = await response.json();
+        setTasks(data);
+        setLoading(false);
+      } catch {
+        setLoadError('Could not load tasks. Check your connection and try again.');
+        setLoading(false);
+      }
+    }
+
     void loadTasks();
-    return () => currentLoad.current?.abort();
-  }, [loadTasks]);
+  }, [reloadKey]);
 
   // Save the draft, then reload the list only after the POST succeeds.
   async function addTask(event: FormEvent<HTMLFormElement>) {
@@ -493,7 +482,8 @@ export default function Home() {
       }
 
       setTitle('');
-      await loadTasks();
+      // Changing the key makes the effect above fetch the list again.
+      setReloadKey(key => key + 1);
       setBusy(false);
     } catch {
       setError('Could not connect to the server');
@@ -534,7 +524,11 @@ export default function Home() {
       {loadError && (
         <div role="alert" className="mt-3 text-rose-300">
           <p>{loadError}</p>
-          <button type="button" onClick={() => void loadTasks()} disabled={loading}>
+          <button
+            type="button"
+            onClick={() => setReloadKey(key => key + 1)}
+            disabled={loading}
+          >
             Retry loading tasks
           </button>
         </div>
@@ -558,14 +552,17 @@ export default function Home() {
 ```
 
 `value` and `onChange` make the input controlled by React. The input remains
-available after a failed POST. After success, `loadTasks()` calls GET again
-and updates the displayed copy; it does not use `router.refresh()`.
+available after a failed POST. After success, increasing `reloadKey` makes the
+effect call GET again and update the displayed copy; it does not use
+`router.refresh()`.
 
-`useEffect` starts the first GET when the page appears. `useCallback` keeps
-`loadTasks` stable between renders. An `AbortController` cancels an older GET
-when another begins or the page unmounts, preventing an old response from
-replacing a newer list. In development, React may run the effect setup and
-cleanup an extra time; cancellation makes that safe.
+`useEffect` starts the first GET when the page appears. `reloadKey` is a simple
+signal: changing it makes the effect run again. The async `loadTasks` function
+is defined inside the effect, so this example does not need `useCallback`,
+`useRef`, or an `AbortController`.
+This beginner version also does not cancel a request if another refresh starts
+before it finishes; add that extra protection later if overlapping requests
+become a real concern.
 
 The list has its own loading and error state. If POST succeeds but the
 following GET fails, the title is cleared because the task was saved; use

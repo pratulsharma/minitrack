@@ -14,10 +14,10 @@ separate practice and application files. The original app and DSA lessons
 remain linked from each day for comparison.
 
 **Architecture transition:** Prep Day 01 now fetches tasks in a Client
-Component through the API, and Prep Days 02–04 continue that approach.
-Days 05–25 still teach the earlier server-rendered
-approach and need further updates before their code can continue from the new
-Day 01 page.
+Component through the API, and Prep Days 02–08 continue that approach.
+Days 09–25 have not yet been fully adapted from the earlier server-rendered
+approach; their instructions may need further changes before continuing from
+the new client page.
 
 ## Daily track
 

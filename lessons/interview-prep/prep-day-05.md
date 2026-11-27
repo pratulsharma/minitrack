@@ -1,10 +1,5 @@
 # Prep Day 05 — Make search and filters shareable
 
-> **Architecture transition:** This lesson still uses server-rendered task
-> data and has not yet been adapted to the client-fetch page introduced in
-> Prep Days 01–04. Its page and task-board code cannot be applied directly
-> to that client page without further changes.
-
 **Date:** Monday, November 30, 2026  
 **Time:** 7 study hours plus breaks  
 **Starting point:** App Days 1–4 are complete. Continue from the current learner workspace and the previous preparation-day exit checklist.  
@@ -59,7 +54,7 @@ Do not copy the source paragraph. Write what you remember, then compare.
 
 **Backend focus — Reading and normalizing search parameters:** The server treats query parameters as untrusted strings, normalizes allowed values, and passes a typed filter to the data function.
 
-**Today's connection:** The URL becomes the input to server rendering, so navigation and data selection describe the same state.
+**Today's connection:** The client sends the URL filters to the API, so navigation and data selection describe the same state.
 
 ```mermaid
 flowchart LR
@@ -337,7 +332,7 @@ Compare the two kinds of state already in MiniTrack:
 
 | Value | Where it lives | Survives reload? | Shareable? |
 |---|---|---|---|
-| `title` draft in `TaskBoard` | React `useState` | No | No |
+| `title` draft in `page.tsx` | React `useState` | No | No |
 | `editingId` and `editTitle` (Prep Day 04) | React `useState` | No | No |
 | Day 5 `filter` in the **Show** select | React `useState` | No | No |
 | `q` and `status` after today | URL: `/?q=react&status=open` | Yes | Yes |
@@ -358,20 +353,20 @@ Today's URL contract is:
 ```mermaid
 flowchart TD
   A["1. User submits search form"] --> B["2. Browser navigates with ?q=&status="]
-  B --> C["3. Next.js provides searchParams"]
-  C --> D["4. Validate and normalize values"]
+  B --> C["3. Client page requests /api/tasks with the URL query"]
+  C --> D["4. API validates and normalizes values"]
   D --> E["5. Build bound PostgreSQL query"]
   E --> F["6. PostgreSQL filters rows"]
-  F --> G["7. Server Component renders results"]
+  F --> G["7. Client displays returned results"]
 ```
 
 The form uses `method="GET"`. When a GET form is submitted, the browser
 itself turns each named field into the query string: `name="q"` becomes `q=`
-and `name="status"` becomes `status=`. No JavaScript, `useState`, or `fetch`
-is needed, so there are no debounce timers or out-of-order responses yet.
+and `name="status"` becomes `status=`. The form causes a normal browser
+navigation; after it loads, the client page fetches the filtered results.
 
-Create `frontend/app/SearchForm.tsx`. It has no `'use client'`, so it is a
-Server Component:
+Create `frontend/app/SearchForm.tsx`. Because the Client Component imports it,
+it becomes part of the client component tree:
 
 ```tsx
 import type { TaskFilters } from '../lib/validation';
@@ -379,11 +374,13 @@ import type { TaskFilters } from '../lib/validation';
 export default function SearchForm({ filters }: { filters: TaskFilters }) {
   return (
     // method="GET" puts the field values in the URL: /?q=...&status=...
+    // grid arranges controls; gap adds spacing; sm: changes columns on wider screens.
     <form
       className="my-6 grid gap-3 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:grid-cols-[1fr_auto_auto]"
       method="GET"
     >
       <label>
+        {/* sr-only keeps the label available to screen readers without showing it. */}
         <span className="sr-only">Search task titles</span>
         <input
           className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3"
@@ -426,7 +423,7 @@ rule from the What section.
 Files to open deliberately:
 
 - `frontend/app/page.tsx`
-- `frontend/app/TaskBoard.tsx`
+- `frontend/app/api/tasks/route.ts`
 - `frontend/lib/tasks.ts`
 
 Answer before coding:
@@ -436,10 +433,8 @@ Answer before coding:
 - What should the user see while work is pending?
 - What should remain unchanged when the operation fails?
 
-**Leave `TaskBoard.tsx` unchanged today.** It still has the Day 5 **Show**
-select (`useState<Filter>`). That select only narrows the list the server has
-already filtered, and it is lost on reload. Keep it for now as the contrast in
-today's debugging exercise.
+Remove the old local **Show** filter as described below, so there is only one
+applied status filter: the one in the URL.
 
 ## 5. Backend guided study (1 hour 30 minutes)
 
@@ -517,7 +512,7 @@ is valid.
 | `/` | `{ query: '', status: 'all' }` |
 | `/?q=%20%20React%20%20&status=open` | `{ query: 'React', status: 'open' }` |
 | `/?status=banana` | `{ query: '', status: 'all' }` |
-| `/?q=a&q=b` | `{ query: '', status: 'all' }` (array is not a string) |
+| `/?q=a&q=b` | `{ query: 'a', status: 'all' }` (`URLSearchParams.get` reads the first value) |
 
 ### Step 2: Add a first filtered query
 
@@ -571,94 +566,120 @@ quote such as `Bob's task` is data, not SQL syntax.
 
 **Milestone source:** Day 8 URL-backed search and status filters
 
-1. Read searchParams in the Server Component.
-2. Build a form or navigation update that writes q and status to the URL.
+1. Make the GET API normalize filters and query PostgreSQL.
+2. Read the URL in the client and send its query string to the API.
 3. Verify reload and copied URLs preserve the result.
 
-### Step 1: Read searchParams in the page
+### Step 1: Update the GET API
 
-Next.js gives a page its query string as `searchParams`, which is a
-**Promise**. Awaiting it inside the `Suspense` subtree makes only that part
-request-specific, so the header stays in the static shell. You do not need
-`io()` in this component: awaiting `searchParams` already marks it as
-request-time. Do not add `dynamic = 'force-dynamic'`.
+In `frontend/app/api/tasks/route.ts`, keep the existing POST handler. Replace
+the imports and GET handler with these; the relative paths start three
+directories below `frontend/`:
 
-Replace `frontend/app/page.tsx` with:
+```ts
+import type { NextRequest } from 'next/server';
+import { createTask, searchTasks } from '../../../lib/tasks';
+import { isRecord, normalizeTaskFilters, normalizeTitle } from '../../../lib/validation';
 
-```tsx
-import { Suspense } from 'react';
-import SearchForm from './SearchForm';
-import TaskBoard from './TaskBoard';
-import { searchTasks } from '../lib/tasks';
-import { normalizeTaskFilters } from '../lib/validation';
-import type { Task } from './types';
-
-type PageProps = {
-  searchParams: Promise<{
-    q?: string;
-    status?: string;
-  }>;
-};
-
-async function TaskResults({ searchParams }: PageProps) {
-  // Awaiting searchParams makes this subtree request-specific.
-  const params = await searchParams;
-  const filters = normalizeTaskFilters(params.q, params.status);
-
-  let tasks: Task[] = [];
-  let error: string | null = null;
+export async function GET(request: NextRequest): Promise<Response> {
+  // The server checks untrusted URL values before using them in the query.
+  const filters = normalizeTaskFilters(
+    request.nextUrl.searchParams.get('q'),
+    request.nextUrl.searchParams.get('status'),
+  );
   try {
-    tasks = await searchTasks(filters);
-  } catch (err) {
-    error = err instanceof Error ? err.message : 'Unable to load tasks';
+    return Response.json(await searchTasks(filters), {
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  } catch (error: unknown) {
+    console.error('GET /api/tasks failed:', error);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
-
-  return (
-    <>
-      {/* The form shows the same filters the URL and SQL used. */}
-      <SearchForm filters={filters} />
-      {error ? (
-        <p
-          className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-200"
-          role="alert"
-        >
-          Could not load tasks: {error}. Check PostgreSQL and DATABASE_URL.
-        </p>
-      ) : (
-        <TaskBoard tasks={tasks} />
-      )}
-    </>
-  );
-}
-
-export default function Home({ searchParams }: PageProps) {
-  return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-12">
-      <header className="mb-8">
-        <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">
-          Your workspace
-        </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight">MiniTrack</h1>
-        <p className="mt-2 text-slate-400">
-          Simple tasks. Serious full-stack concepts.
-        </p>
-      </header>
-
-      <Suspense fallback={<p className="mt-8 text-slate-400">Filtering tasks...</p>}>
-        <TaskResults searchParams={searchParams} />
-      </Suspense>
-    </main>
-  );
 }
 ```
 
-`Home` is not `async`; it passes the unresolved Promise down. `TaskResults`
-awaits it, normalizes once, and uses the same `filters` for both the SQL call
-and the form's default values, so the screen and the URL cannot disagree.
-`listTasks` is no longer used by the page; keep it in `tasks.ts` because
-`GET /api/tasks` still uses it until Prep Day 06.
+### Step 2: Connect the client page
 
-### Step 2: Run and verify
+Continue editing `frontend/app/page.tsx` from Prep Day 04; do not replace it
+with a Server Component. Add these imports:
+
+```tsx
+import SearchForm from './SearchForm';
+import { normalizeTaskFilters } from '../lib/validation';
+```
+
+Near the existing state declarations, add a state value for the applied URL
+filters and a reload counter. The filters start with safe defaults because
+browser globals are not available during server rendering:
+
+```tsx
+// The URL is the source of truth for the applied search and status.
+const [filters, setFilters] = useState(() => normalizeTaskFilters('', 'all'));
+// Increase this after a successful change to fetch the list again.
+const [reloadKey, setReloadKey] = useState(0);
+```
+
+Use this effect to read the current URL and fetch its matching tasks. The URL
+search string is included in the GET request:
+
+```tsx
+useEffect(() => {
+  async function loadTasks() {
+    setLoading(true);
+    setLoadError('');
+
+    try {
+      // The URL carries the selected search and status filters.
+      const response = await fetch(`/api/tasks${window.location.search}`, {
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        setLoadError(`Could not load tasks (${response.status})`);
+        setLoading(false);
+        return;
+      }
+
+      const data: Task[] = await response.json();
+      setTasks(data);
+      setLoading(false);
+    } catch {
+      setLoadError('Could not load tasks. Check your connection and try again.');
+      setLoading(false);
+    }
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  setFilters(normalizeTaskFilters(params.get('q'), params.get('status')));
+  void loadTasks();
+}, [reloadKey]);
+```
+
+Remove `type Filter`, the `filter` state, its derived `visibleTasks` block,
+and the local **Show** label and select. Replace the derived block with:
+
+```tsx
+// The API has already filtered the list for the current URL.
+const visibleTasks = tasks;
+```
+
+In the page JSX, put the following immediately after the `<h1>`. The key
+recreates the uncontrolled form after the URL values are read, so its
+`defaultValue` fields show those values:
+
+```tsx
+<SearchForm key={JSON.stringify(filters)} filters={filters} />
+```
+
+Keep the add/edit form and its request handlers. Replace the count
+with `Showing {visibleTasks.length} tasks`, since the response does not contain
+the unfiltered total. Use `No tasks match these filters.` for the empty state.
+
+The form navigates to a new URL; the effect runs after the new page appears.
+After a successful mutation, use `setReloadKey(key => key + 1)` so the effect
+fetches the matching list again. This uses the same simple pattern as earlier
+days without needing `useCallback`, `useRef`, or request-cancellation code.
+
+### Step 3: Run and verify
 
 With PostgreSQL running and `frontend/.env.local` configured, from the
 repository root:
@@ -682,7 +703,7 @@ Add tasks such as `Learn React`, `Review SQL`, and `React testing`, then mark
 5. Visit `/?status=banana`. The select shows **All** and all tasks appear.
 6. Visit `/?q=zzzz`. The board shows its empty message.
 7. Add, complete, edit, and delete a task while a filter is applied; each
-   still works and the list refreshes through `router.refresh()`.
+   still works and the list is reloaded through `GET /api/tasks`.
 
 **Expected observation:** the user-visible milestone works, its important
 failure path is explicit, and existing behavior remains intact.
@@ -692,9 +713,8 @@ failure path is explicit, and existing behavior remains intact.
 - Stop PostgreSQL and reload: the page shows the `role="alert"` message, not
   an empty list that looks like "no matches". Restart PostgreSQL afterwards.
 - If the URL changes but results do not, confirm the inputs have `name="q"`
-  and `name="status"` and that `TaskResults` passes `filters` to `searchTasks`.
-- If TypeScript reports that `searchParams` is not a Promise, check the
-  `PageProps` type and that you `await` it.
+  and `name="status"`, the page includes `window.location.search` in its GET,
+  and the API passes normalized filters to `searchTasks`.
 
 **Known gap for Prep Day 06:** searching for `%` currently matches every
 title because `%` is still a wildcard. That is a search-semantics bug, not
@@ -706,17 +726,19 @@ SQL injection: the value is bound.
 sequenceDiagram
   participant U as User
   participant B as Browser
-  participant N as Next.js page.tsx
+  participant N as Client page.tsx
+  participant A as GET /api/tasks
   participant V as normalizeTaskFilters
   participant P as PostgreSQL
   U->>B: Type react, choose Open, press Apply
-  B->>N: GET /?q=react&status=open
-  N->>N: Send static header and Suspense fallback
-  N->>V: params.q = "react", params.status = "open"
-  V-->>N: { query: "react", status: "open" }
-  N->>P: SELECT ... ILIKE $1 ... with ["%react%", "open"]
-  P-->>N: Matching open rows, or an error
-  N-->>B: Stream SearchForm + TaskBoard, or alert
+  B->>N: Navigate to /?q=react&status=open
+  N->>A: GET /api/tasks?q=react&status=open
+  A->>V: q = "react", status = "open"
+  V-->>A: { query: "react", status: "open" }
+  A->>P: SELECT ... ILIKE $1 ... with ["%react%", "open"]
+  P-->>A: Matching open rows, or an error
+  A-->>N: JSON tasks or error response
+  N-->>B: Render results or alert
   B-->>U: URL, form, and list show the same filters
 ```
 
@@ -726,9 +748,8 @@ Trace one concrete input. Name every boundary, value, and possible failure.
 
 **Break it:** Keep the active filter only in component state.
 
-You do not need to write new code: the Day 5 **Show** select in `TaskBoard`
-is exactly this design. Choose **Done** in that select (not in the search
-form), copy the URL, and reload.
+Imagine storing the chosen status only in React state rather than submitting
+it in the URL. Write down what happens when you copy the URL and reload.
 
 **Predict before running:** write the expected symptom in your notebook.
 
@@ -737,7 +758,7 @@ form), copy the URL, and reload.
 **Root cause:** Local state is not a durable navigation representation.
 
 **Restore and verify:** Move committed filter state into search parameters.
-Use the search form's **Status** select instead, reload, and confirm
+Use the search form's **Status** select, reload, and confirm
 `status=done` survives in the URL and on screen.
 
 Do not stop after making the symptom disappear. Explain why the repair restores
@@ -752,7 +773,7 @@ the intended invariant.
 **Example:** In `frontend/app/SearchForm.tsx`, the search input uses
 `defaultValue={filters.query}`, so typing is a local browser draft. Pressing
 **Apply** submits the GET form and the URL becomes `/?q=react&status=open`.
-In contrast, `TaskBoard`'s `title` and `editTitle` are `useState` drafts that
+In contrast, the client page's `title` and `editTitle` are `useState` drafts that
 should never appear in the URL.
 
 **Senior follow-up:** URL state becomes hard to maintain when there are many
@@ -765,7 +786,7 @@ and cancellation while still writing the committed value to the URL.
 
 **Interview-ready answer:** The server treats query parameters as untrusted strings, normalizes allowed values, and passes a typed filter to the data function.
 
-**Example:** `normalizeTaskFilters(params.q, params.status)` turns
+**Example:** `normalizeTaskFilters(params.get('q'), params.get('status'))` turns
 `/?q=  React  &status=banana` into `{ query: 'React', status: 'all' }`.
 `searchTasks(filters)` then binds `'%React%'` and `'all'` as `$1` and `$2`.
 
@@ -789,12 +810,12 @@ only be read forwards, two pointers no longer apply directly.
 
 ### Q4. How does today's work fit the complete MiniTrack system?
 
-**Interview-ready answer:** The URL becomes the input to server rendering, so navigation and data selection describe the same state.
+**Interview-ready answer:** The client sends the URL filters to the API, which validates them and reads matching data. Navigation and data selection describe the same state.
 
-**Example:** Applying the form sends `GET /?q=react&status=open`. The page
-awaits `searchParams`, normalizes it, runs one parameterized `SELECT`, and
-streams `SearchForm` plus `TaskBoard`. A colleague opening the same URL gets
-the same view.
+**Example:** Applying the form opens `/?q=react&status=open`. The client
+requests `/api/tasks?q=react&status=open`, and the API normalizes the
+parameters and runs one parameterized `SELECT`. A colleague opening the same
+URL gets the same view.
 
 **Senior follow-up:** The first bottleneck to measure is the `%react%`
 `ILIKE` query, which can scan every row. Check it with `EXPLAIN` on realistic
